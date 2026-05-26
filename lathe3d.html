@@ -1,754 +1,327 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3D 회전체 생성기</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>3D Lathe Generator</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+KR:wght@300;400;700&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0a0a0f;
-    --panel: #111118;
-    --border: #1e1e2e;
-    --accent: #7c5cfc;
-    --accent2: #c084fc;
-    --accent3: #38bdf8;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --canvas-bg: #0d0d16;
-    --grid: rgba(124,92,252,0.08);
-  }
-
-  html, body {
-    width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans KR', sans-serif;
-    overflow: hidden;
-  }
-
-  #app {
-    display: flex;
-    height: 100vh;
-    gap: 0;
-  }
-
-  /* ── LEFT PANEL ── */
-  #left {
-    width: 340px;
-    flex-shrink: 0;
-    background: var(--panel);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    z-index: 10;
-  }
-
-  #header {
-    padding: 20px 22px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  #header h1 {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--accent2);
-    text-transform: uppercase;
-  }
-
-  #header p {
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 4px;
-    line-height: 1.5;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* Draw canvas */
-  #draw-wrap {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    background: var(--canvas-bg);
-  }
-
-  #draw-canvas {
-    display: block;
-    cursor: crosshair;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* axis indicator */
-  #axis-label {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--accent);
-    background: rgba(124,92,252,0.12);
-    border: 1px solid rgba(124,92,252,0.25);
-    padding: 2px 10px;
-    border-radius: 20px;
-    pointer-events: none;
-    letter-spacing: 0.08em;
-  }
-
-  #controls {
-    padding: 14px 16px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .ctrl-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .btn {
-    flex: 1;
-    padding: 9px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-
-  .btn:hover {
-    border-color: var(--accent);
-    color: var(--accent2);
-    background: rgba(124,92,252,0.08);
-  }
-
-  .btn-primary {
-    flex: 1;
-    padding: 11px 16px;
-    border-radius: 6px;
-    border: 1px solid var(--accent);
-    background: linear-gradient(135deg, rgba(124,92,252,0.2), rgba(192,132,252,0.15));
-    color: var(--accent2);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    transition: all 0.25s;
-    text-transform: uppercase;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-primary::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    opacity: 0;
-    transition: opacity 0.25s;
-  }
-
-  .btn-primary:hover::before { opacity: 0.15; }
-  .btn-primary:hover {
-    box-shadow: 0 0 20px rgba(124,92,252,0.3);
-    transform: translateY(-1px);
-  }
-
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-primary span { position: relative; z-index: 1; }
-
-  .label-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  .pt-count {
-    color: var(--accent3);
-    font-weight: 600;
-  }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 2px;
-    background: var(--border);
-    border-radius: 2px;
-    outline: none;
-  }
-
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    box-shadow: 0 0 6px rgba(124,92,252,0.5);
-  }
-
-  .slider-wrap { display: flex; flex-direction: column; gap: 6px; }
-
-  /* ── RIGHT / 3D ── */
-  #right {
-    flex: 1;
-    position: relative;
-    background: var(--bg);
-  }
-
-  #three-canvas {
-    display: block;
-    width: 100% !important;
-    height: 100% !important;
-  }
-
-  #three-hint {
-    position: absolute;
-    bottom: 18px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 0.08em;
-    pointer-events: none;
-    white-space: nowrap;
-  }
-
-  #empty-hint {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    pointer-events: none;
-  }
-
-  #empty-hint .big {
-    font-size: 48px;
-    opacity: 0.07;
-  }
-
-  #empty-hint .msg {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  /* mode badge */
-  #mode-badge {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    padding: 4px 10px;
-    border-radius: 20px;
-    text-transform: uppercase;
-  }
-
-  .badge-draw {
-    background: rgba(56,189,248,0.1);
-    border: 1px solid rgba(56,189,248,0.25);
-    color: var(--accent3);
-  }
-
-  .badge-3d {
-    background: rgba(124,92,252,0.12);
-    border: 1px solid rgba(124,92,252,0.3);
-    color: var(--accent2);
-  }
+  :root{--bg:#0b0f17;--panel:#111827;--panel2:#0f172a;--line:#263244;--text:#e5e7eb;--muted:#94a3b8;--accent:#38bdf8;--warn:#fb7185}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(135deg,#070b12,#111827);color:var(--text);font-family:Inter,system-ui,Segoe UI,sans-serif;overflow:hidden}
+  .app{display:grid;grid-template-columns:1fr 1fr;height:100vh;gap:12px;padding:12px}
+  .panel{background:rgba(17,24,39,.88);border:1px solid #263244;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px #0008}
+  .head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #263244}
+  .title{font-weight:800;letter-spacing:.2px}
+  .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#0b1220;color:#7dd3fc;border:1px solid #1e3a5f}
+  .badge.view{color:#bbf7d0;border-color:#166534}
+  .canvasWrap,.viewWrap{position:relative;flex:1;min-height:0}
+  canvas{display:block;width:100%;height:100%}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-top:1px solid #263244;background:rgba(15,23,42,.9)}
+  button{border:1px solid #334155;background:#182235;color:var(--text);padding:9px 13px;border-radius:12px;font-weight:700;cursor:pointer}
+  button:hover{border-color:#38bdf8;background:#1e293b}
+  button.warn{animation:shake .18s linear 2;border-color:var(--warn);color:#fecdd3}
+  @keyframes shake{50%{transform:translateX(3px)}}
+  .stat{color:var(--muted);font-size:13px;margin-right:auto}
+  label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  input[type=range]{width:120px;accent-color:var(--accent)}
+  .hint{position:absolute;left:14px;bottom:14px;color:#94a3b8;font-size:12px;background:#02061799;border:1px solid #243044;border-radius:12px;padding:8px 10px;pointer-events:none}
+  @media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.head{height:48px}.toolbar{padding:9px}}
 </style>
 </head>
 <body>
-<div id="app">
-
-  <!-- LEFT: 2D drawing panel -->
-  <div id="left">
-    <div id="header">
-      <h1>3D Lathe Generator</h1>
-      <p>// 왼쪽에 단면 윤곽을 그리세요<br>// 중심축을 기준으로 회전체를 생성합니다</p>
+<div class="app">
+  <section class="panel">
+    <div class="head">
+      <div class="title">2D 단면 드로잉</div>
+      <div id="modeBadge" class="badge">DRAW MODE</div>
     </div>
-
-    <div id="draw-wrap">
-      <canvas id="draw-canvas"></canvas>
-      <div id="axis-label">◀ 회전 중심축</div>
+    <div class="canvasWrap"><canvas id="drawCanvas"></canvas></div>
+    <div class="toolbar">
+      <span id="ptCount" class="stat">0 pts</span>
+      <button id="undoBtn">Undo</button>
+      <button id="clearBtn">Clear</button>
+      <button id="createBtn">Create 3D</button>
+      <label>Segments <input id="segSlider" type="range" min="6" max="128" value="32"><span id="segVal">32</span></label>
+      <label>Wire <input id="wireSlider" type="range" min="0" max="100" value="28"><span id="wireVal">28%</span></label>
     </div>
+  </section>
 
-    <div id="controls">
-      <div class="label-row">
-        <span>점 개수</span>
-        <span class="pt-count" id="pt-count">0 pts</span>
-      </div>
-
-      <div class="slider-wrap">
-        <div class="label-row">
-          <span>회전 분할 수</span>
-          <span class="pt-count" id="seg-val">32</span>
-        </div>
-        <input type="range" id="seg-slider" min="6" max="128" value="32">
-      </div>
-
-      <div class="slider-wrap">
-        <div class="label-row">
-          <span>와이어프레임 불투명도</span>
-          <span class="pt-count" id="wire-val">30%</span>
-        </div>
-        <input type="range" id="wire-slider" min="0" max="100" value="30">
-      </div>
-
-      <div class="ctrl-row">
-        <button class="btn" id="btn-undo">↩ Undo</button>
-        <button class="btn" id="btn-clear">✕ Clear</button>
-      </div>
-
-      <button class="btn-primary" id="btn-create">
-        <span>⟳ Create 3D</span>
-      </button>
+  <section class="panel">
+    <div class="head"><div class="title">3D 미리보기</div></div>
+    <div class="viewWrap">
+      <canvas id="threeCanvas"></canvas>
+      <div class="hint">좌클릭 드래그 회전 · 우클릭 드래그 팬 · 휠/핀치 줌</div>
     </div>
-  </div>
-
-  <!-- RIGHT: Three.js 3D view -->
-  <div id="right">
-    <div id="empty-hint" id="empty-hint">
-      <div class="big">◎</div>
-      <div class="msg">왼쪽에 선을 그린 후 Create 3D를 누르세요</div>
-    </div>
-    <canvas id="three-canvas"></canvas>
-    <div id="three-hint">드래그: 회전 &nbsp;|&nbsp; 스크롤: 줌 &nbsp;|&nbsp; 우클릭 드래그: 이동</div>
-    <div id="mode-badge" class="badge-draw">DRAW MODE</div>
-  </div>
-
+  </section>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-// ─────────────────────────────────────────────
-//  2D DRAW CANVAS
-// ─────────────────────────────────────────────
-const drawCanvas = document.getElementById('draw-canvas');
-const dCtx = drawCanvas.getContext('2d');
-const drawWrap = document.getElementById('draw-wrap');
-const ptCountEl = document.getElementById('pt-count');
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
 
-let points = [];       // [{x,y}] in canvas coords
-let isDrawing = false;
+const drawCanvas = document.getElementById("drawCanvas");
+const ctx = drawCanvas.getContext("2d");
+const threeCanvas = document.getElementById("threeCanvas");
+const ptCount = document.getElementById("ptCount");
+const modeBadge = document.getElementById("modeBadge");
+const undoBtn = document.getElementById("undoBtn");
+const clearBtn = document.getElementById("clearBtn");
+const createBtn = document.getElementById("createBtn");
+const segSlider = document.getElementById("segSlider");
+const wireSlider = document.getElementById("wireSlider");
+const segVal = document.getElementById("segVal");
+const wireVal = document.getElementById("wireVal");
 
-function resizeDrawCanvas() {
-  const w = drawWrap.clientWidth;
-  const h = drawWrap.clientHeight;
-  drawCanvas.width = w;
-  drawCanvas.height = h;
-  redraw();
+let points = [];
+let drawing = false;
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+function setDrawMode(is3d=false){
+  modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
+  modeBadge.classList.toggle("view", is3d);
 }
-
-function getAxisX() { return drawCanvas.width / 2; }
-
-function redraw() {
-  const w = drawCanvas.width, h = drawCanvas.height;
-  dCtx.clearRect(0, 0, w, h);
-
-  // grid
-  dCtx.strokeStyle = 'rgba(124,92,252,0.06)';
-  dCtx.lineWidth = 1;
-  for (let x = 0; x < w; x += 30) { dCtx.beginPath(); dCtx.moveTo(x, 0); dCtx.lineTo(x, h); dCtx.stroke(); }
-  for (let y = 0; y < h; y += 30) { dCtx.beginPath(); dCtx.moveTo(0, y); dCtx.lineTo(w, y); dCtx.stroke(); }
-
-  // axis line
-  const ax = getAxisX();
-  dCtx.strokeStyle = 'rgba(124,92,252,0.5)';
-  dCtx.lineWidth = 1;
-  dCtx.setLineDash([4, 4]);
-  dCtx.beginPath(); dCtx.moveTo(ax, 0); dCtx.lineTo(ax, h); dCtx.stroke();
-  dCtx.setLineDash([]);
-
-  if (points.length === 0) return;
-
-  // draw curve
-  dCtx.beginPath();
-  dCtx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    dCtx.lineTo(points[i].x, points[i].y);
-  }
-  dCtx.strokeStyle = '#7c5cfc';
-  dCtx.lineWidth = 2.5;
-  dCtx.lineJoin = 'round';
-  dCtx.lineCap = 'round';
-  dCtx.stroke();
-
-  // dots
-  points.forEach((p, i) => {
-    dCtx.beginPath();
-    dCtx.arc(p.x, p.y, i === points.length - 1 ? 5 : 3.5, 0, Math.PI * 2);
-    dCtx.fillStyle = i === 0 ? '#38bdf8' : '#c084fc';
-    dCtx.fill();
-  });
-}
-
-function getPos(e) {
+function resize2D(){
+  dpr = Math.max(1, window.devicePixelRatio || 1);
   const r = drawCanvas.getBoundingClientRect();
-  const src = e.touches ? e.touches[0] : e;
-  return { x: src.clientX - r.left, y: src.clientY - r.top };
+  drawCanvas.width = Math.max(1, Math.round(r.width * dpr));
+  drawCanvas.height = Math.max(1, Math.round(r.height * dpr));
+  draw();
 }
+function getCanvasPoint(e){
+  const r = drawCanvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (drawCanvas.width / r.width) / dpr;
+  const y = (e.clientY - r.top) * (drawCanvas.height / r.height) / dpr;
+  return {x,y};
+}
+function draw(){
+  const w = drawCanvas.width / dpr, h = drawCanvas.height / dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
 
-drawCanvas.addEventListener('mousedown', e => {
-  isDrawing = true;
-  const p = getPos(e);
-  points.push(p);
-  redraw();
-  updatePtCount();
-});
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(0,0,w,h);
 
-drawCanvas.addEventListener('mousemove', e => {
-  if (!isDrawing) return;
-  const p = getPos(e);
-  const last = points[points.length - 1];
-  const dist = Math.hypot(p.x - last.x, p.y - last.y);
-  if (dist > 6) {
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 1;
+  const grid = 24;
+  for(let x=0;x<=w;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  for(let y=0;y<=h;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+
+  ctx.save();
+  ctx.setLineDash([8,8]);
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(w/2,0); ctx.lineTo(w/2,h); ctx.stroke();
+  ctx.restore();
+
+  if(points.length){
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    points.forEach((p,i)=> i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
+    ctx.stroke();
+
+    for(const p of points){
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3.7,0,Math.PI*2);
+      ctx.fillStyle = "#38bdf8";
+      ctx.fill();
+      ctx.strokeStyle = "#082f49";
+      ctx.stroke();
+    }
+  }
+  ptCount.textContent = `${points.length} pts`;
+}
+function addPoint(p){
+  const last = points[points.length-1];
+  if(!last || Math.hypot(p.x-last.x,p.y-last.y) > 2){
     points.push(p);
-    redraw();
-    updatePtCount();
+    setDrawMode(false);
+    draw();
   }
-});
-    clearDrawPoints();
-
-function updatePtCount() {
-  function setDrawModeBadge() {
-    modeBadge.textContent = 'DRAW MODE';
-    modeBadge.className = 'badge-draw';
-  }
-
-  function clearDrawPoints() {
-    points = [];
-    isDrawing = false;
-    redraw();
-    updatePtCount();
-    setDrawModeBadge();
-  }
-  ptCountEl.textContent = points.length + ' pts';
 }
 
-    setDrawModeBadge();
-document.getElementById('btn-undo').addEventListener('click', () => {
-  points.pop();
-  redraw();
-  updatePtCount();
+drawCanvas.addEventListener("pointerdown", e => {
+  if(e.button !== 0) return;
+  drawing = true;
+  drawCanvas.setPointerCapture(e.pointerId);
+  addPoint(getCanvasPoint(e));
 });
+drawCanvas.addEventListener("pointermove", e => drawing && addPoint(getCanvasPoint(e)));
+drawCanvas.addEventListener("pointerup", () => drawing = false);
+drawCanvas.addEventListener("pointercancel", () => drawing = false);
 
-document.getElementById('btn-clear').addEventListener('click', () => {
-  points = [];
-  redraw();
-  updatePtCount();
-});
-
-const segSlider = document.getElementById('seg-slider');
-const segVal = document.getElementById('seg-val');
-segSlider.addEventListener('input', () => { segVal.textContent = segSlider.value; });
-
-const wireSlider = document.getElementById('wire-slider');
-const wireVal = document.getElementById('wire-val');
-wireSlider.addEventListener('input', () => {
-  wireVal.textContent = wireSlider.value + '%';
-  if (wireMesh) wireMesh.material.opacity = parseInt(wireSlider.value) / 100;
-});
-
-window.addEventListener('resize', resizeDrawCanvas);
-resizeDrawCanvas();
-
-// ─────────────────────────────────────────────
-//  THREE.JS SETUP
-// ─────────────────────────────────────────────
-const threeCanvas = document.getElementById('three-canvas');
-const rightDiv = document.getElementById('right');
-const emptyHint = document.getElementById('empty-hint');
-const modeBadge = document.getElementById('mode-badge');
-
-const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a0f);
-
-// Fog
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
-
-// Camera
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 500);
-camera.position.set(4, 2, 5);
-camera.lookAt(0, 0, 0);
-
-// Lights
-const ambient = new THREE.AmbientLight(0x7c5cfc, 0.4);
-scene.add(ambient);
-
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-dirLight.position.set(5, 10, 7);
-dirLight.castShadow = true;
-scene.add(dirLight);
-
-const pointL1 = new THREE.PointLight(0x7c5cfc, 1.5, 30);
-pointL1.position.set(-4, 4, 2);
-scene.add(pointL1);
-
-const pointL2 = new THREE.PointLight(0x38bdf8, 1.2, 30);
-pointL2.position.set(4, -2, -3);
-scene.add(pointL2);
-
-// Grid helper
-const grid = new THREE.GridHelper(20, 40, 0x1e1e2e, 0x1e1e2e);
-scene.add(grid);
-
-// Resize
-function resizeThree() {
-  const w = rightDiv.clientWidth, h = rightDiv.clientHeight;
-  renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-
-window.addEventListener('resize', resizeThree);
-resizeThree();
-
-// ─────────────────────────────────────────────
-//  ORBIT CONTROLS (manual, no import needed)
-// ─────────────────────────────────────────────
-const orbit = {
-  spherical: new THREE.Spherical().setFromVector3(camera.position),
-  target: new THREE.Vector3(0, 0, 0),
-  dragging: false,
-  rightDrag: false,
-  lastX: 0, lastY: 0,
+undoBtn.onclick = () => { points.pop(); setDrawMode(false); draw(); };
+clearBtn.onclick = () => { points = []; clearLathe(); setDrawMode(false); draw(); };
+segSlider.oninput = () => segVal.textContent = segSlider.value;
+wireSlider.oninput = () => {
+  wireVal.textContent = `${wireSlider.value}%`;
+  if(wireMat) wireMat.opacity = +wireSlider.value / 100;
 };
 
-threeCanvas.addEventListener('contextmenu', e => e.preventDefault());
+new ResizeObserver(resize2D).observe(drawCanvas.parentElement);
+window.addEventListener("resize", () => { resize2D(); resize3D(); });
 
-threeCanvas.addEventListener('mousedown', e => {
-  if (e.button === 2) { orbit.rightDrag = true; }
-  else { orbit.dragging = true; }
-  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
-});
+const renderer = new THREE.WebGLRenderer({canvas:threeCanvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.setClearColor(0x08101d);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x08101d, 7, 18);
 
-window.addEventListener('mouseup', () => { orbit.dragging = false; orbit.rightDrag = false; });
+const camera = new THREE.PerspectiveCamera(45,1,.05,100);
+let target = new THREE.Vector3(0,0,0);
+let radius = 6, theta = Math.PI/4, phi = Math.PI/2.4;
 
-window.addEventListener('mousemove', e => {
-  const dx = e.clientX - orbit.lastX, dy = e.clientY - orbit.lastY;
-  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
-  if (orbit.dragging) {
-    orbit.spherical.theta -= dx * 0.006;
-    orbit.spherical.phi -= dy * 0.006;
-    orbit.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbit.spherical.phi));
-    updateCamera();
-  }
-  if (orbit.rightDrag) {
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3();
-    camera.getWorldDirection(right); right.cross(camera.up).normalize();
-    up.copy(camera.up);
-    orbit.target.addScaledVector(right, -dx * 0.005);
-    orbit.target.addScaledVector(up, dy * 0.005);
-    updateCamera();
-  }
-});
+scene.add(new THREE.AmbientLight(0xffffff,.42));
+const dir = new THREE.DirectionalLight(0xffffff,1.4); dir.position.set(4,6,5); scene.add(dir);
+const point = new THREE.PointLight(0x7dd3fc,2.2,20); point.position.set(-3,2,4); scene.add(point);
+const gridHelper = new THREE.GridHelper(8,32,0x334155,0x1f2937); scene.add(gridHelper);
 
-threeCanvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  orbit.spherical.radius *= 1 + e.deltaY * 0.001;
-  orbit.spherical.radius = Math.max(0.5, Math.min(50, orbit.spherical.radius));
-  updateCamera();
-}, { passive: false });
-
-// Touch
-let lastTouchDist = 0;
-threeCanvas.addEventListener('touchstart', e => {
-  if (e.touches.length === 1) {
-    orbit.dragging = true;
-    orbit.lastX = e.touches[0].clientX;
-    orbit.lastY = e.touches[0].clientY;
-  } else if (e.touches.length === 2) {
-    orbit.dragging = false;
-    lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-  }
-});
-threeCanvas.addEventListener('touchmove', e => {
-  if (e.touches.length === 1 && orbit.dragging) {
-    const dx = e.touches[0].clientX - orbit.lastX, dy = e.touches[0].clientY - orbit.lastY;
-    orbit.lastX = e.touches[0].clientX; orbit.lastY = e.touches[0].clientY;
-    orbit.spherical.theta -= dx * 0.006;
-    orbit.spherical.phi -= dy * 0.006;
-    orbit.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbit.spherical.phi));
-    updateCamera();
-  } else if (e.touches.length === 2) {
-    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    orbit.spherical.radius *= lastTouchDist / d;
-    orbit.spherical.radius = Math.max(0.5, Math.min(50, orbit.spherical.radius));
-    lastTouchDist = d;
-    updateCamera();
-  }
-  e.preventDefault();
-}, { passive: false });
-threeCanvas.addEventListener('touchend', () => { orbit.dragging = false; });
-
-function updateCamera() {
-  const pos = new THREE.Vector3().setFromSpherical(orbit.spherical);
-  camera.position.copy(pos.add(orbit.target));
-  camera.lookAt(orbit.target);
-}
-
-// ─────────────────────────────────────────────
-//  3D MESH CREATION
-// ─────────────────────────────────────────────
-let latheMesh = null, wireMesh = null;
-
-function buildLathe(pts, segments) {
-  // Convert canvas coords → 3D lathe points
-  // Canvas: x right, y down. Axis is at canvas center (x = canvas.width/2)
-  // Lathe: radius = distance from axis, height from top
-
-  const cw = drawCanvas.width, ch = drawCanvas.height;
-  const axX = cw / 2;
-
-  // Map to normalized coords, center vertically
-  const normalized = pts.map(p => ({
-    r: Math.abs(p.x - axX) / (cw / 2),   // 0..1 radius
-    y: 1 - p.y / ch                        // 0..1 height (flipped)
-  }));
-
-  // Scale to reasonable 3D size
-  const scale = 2.5;
-  const lathePts = normalized.map(p =>
-    new THREE.Vector2(p.r * scale, (p.y - 0.5) * scale * 1.5)
+let mesh=null, wire=null, wireMat=null;
+function updateCamera(){
+  phi = Math.max(.15, Math.min(Math.PI-.15, phi));
+  radius = Math.max(1.5, Math.min(20, radius));
+  camera.position.set(
+    target.x + radius * Math.sin(phi) * Math.sin(theta),
+    target.y + radius * Math.cos(phi),
+    target.z + radius * Math.sin(phi) * Math.cos(theta)
   );
-
-  const geo = new THREE.LatheGeometry(lathePts, segments);
-
-  // Smooth normals
-  geo.computeVertexNormals();
-
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x6d28d9,
-    metalness: 0.3,
-    roughness: 0.45,
-    side: THREE.DoubleSide,
-    envMapIntensity: 0.5,
-  });
-
-  // Color gradient via vertex colors
-  const posAttr = geo.attributes.position;
-  const colors = [];
-  const colA = new THREE.Color(0x7c5cfc);
-  const colB = new THREE.Color(0x38bdf8);
-  let minY = Infinity, maxY = -Infinity;
-  for (let i = 0; i < posAttr.count; i++) {
-    const y = posAttr.getY(i);
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  }
-  for (let i = 0; i < posAttr.count; i++) {
-    const t = (posAttr.getY(i) - minY) / (maxY - minY);
-    const c = colA.clone().lerp(colB, t);
-    colors.push(c.r, c.g, c.b);
-  }
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  mat.vertexColors = true;
-
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-
-  // Wireframe overlay
-  const wireGeo = new THREE.WireframeGeometry(geo);
-  const wireMat = new THREE.LineBasicMaterial({
-    color: 0xc084fc,
-    transparent: true,
-    opacity: parseInt(wireSlider.value) / 100,
-    depthTest: true,
-  });
-  const wMesh = new THREE.LineSegments(wireGeo, wireMat);
-
-  return { mesh, wMesh };
+  camera.lookAt(target);
 }
-
-document.getElementById('btn-create').addEventListener('click', () => {
-  if (points.length < 3) {
-    // Flash hint
-    const btn = document.getElementById('btn-create');
-    btn.style.borderColor = '#f87171';
-    setTimeout(() => btn.style.borderColor = 'var(--accent)', 600);
+function resize3D(){
+  const r = threeCanvas.parentElement.getBoundingClientRect();
+  renderer.setSize(r.width,r.height,false);
+  camera.aspect = r.width / Math.max(1,r.height);
+  camera.updateProjectionMatrix();
+}
+function clearLathe(){
+  for(const o of [mesh,wire]){
+    if(!o) continue;
+    scene.remove(o);
+    o.geometry?.dispose();
+    o.material?.dispose();
+  }
+  mesh = wire = wireMat = null;
+}
+function makeLathe(){
+  if(points.length < 3){
+    createBtn.classList.add("warn");
+    setTimeout(()=>createBtn.classList.remove("warn"),450);
     return;
   }
 
-  // Remove old
-  if (latheMesh) { scene.remove(latheMesh); latheMesh.geometry.dispose(); latheMesh.material.dispose(); }
-  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); }
+  clearLathe();
 
-  const segments = parseInt(segSlider.value);
-  const { mesh, wMesh } = buildLathe(points, segments);
-  latheMesh = mesh;
-  wireMesh = wMesh;
+  const w = drawCanvas.width / dpr, h = drawCanvas.height / dpr;
+  const cx = w / 2;
+  const minY = Math.min(...points.map(p=>p.y));
+  const maxY = Math.max(...points.map(p=>p.y));
+  const maxR = Math.max(...points.map(p=>Math.abs(p.x-cx)), 1);
+  const ySpan = Math.max(1, maxY - minY);
 
-  scene.add(latheMesh);
-  scene.add(wireMesh);
+  const profile = points.map(p => {
+    const r = Math.max(0.015, Math.abs(p.x - cx) / maxR * 1.55);
+    const y = (0.5 - (p.y - minY) / ySpan) * 3.2;
+    return new THREE.Vector2(r,y);
+  });
 
-  emptyHint.style.display = 'none';
-  modeBadge.textContent = '3D VIEW';
-  modeBadge.className = 'badge-3d';
+  const geo = new THREE.LatheGeometry(profile, +segSlider.value);
+  geo.computeVertexNormals();
 
-  // Animate camera to nice position
-  orbit.spherical.set(8, Math.PI / 3, Math.PI / 5);
-  updateCamera();
+  const pos = geo.attributes.position;
+  const colors = [];
+  const colorA = new THREE.Color("#38bdf8");
+  const colorB = new THREE.Color("#a78bfa");
+  const colorC = new THREE.Color("#f472b6");
+  let ymin=Infinity,ymax=-Infinity;
+  for(let i=0;i<pos.count;i++){ const y=pos.getY(i); ymin=Math.min(ymin,y); ymax=Math.max(ymax,y); }
+  for(let i=0;i<pos.count;i++){
+    const t = (pos.getY(i)-ymin) / Math.max(.0001,ymax-ymin);
+    const c = t < .5 ? colorA.clone().lerp(colorB,t*2) : colorB.clone().lerp(colorC,(t-.5)*2);
+    colors.push(c.r,c.g,c.b);
+  }
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors,3));
+
+  const mat = new THREE.MeshStandardMaterial({
+    roughness:.42, metalness:.18, vertexColors:true, side:THREE.DoubleSide
+  });
+  mesh = new THREE.Mesh(geo,mat);
+  scene.add(mesh);
+
+  wireMat = new THREE.LineBasicMaterial({
+    color:0xffffff, transparent:true, opacity:+wireSlider.value/100, depthTest:true
+  });
+  wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo), wireMat);
+  scene.add(wire);
+
+  setDrawMode(true);
+}
+createBtn.onclick = makeLathe;
+
+const active = new Map();
+let dragMode="rotate", lastX=0, lastY=0, lastPinch=0, dragging=false;
+
+threeCanvas.addEventListener("contextmenu", e=>e.preventDefault());
+threeCanvas.addEventListener("pointerdown", e=>{
+  threeCanvas.setPointerCapture(e.pointerId);
+  active.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  dragging = true;
+  dragMode = e.button === 2 ? "pan" : "rotate";
+  lastX=e.clientX; lastY=e.clientY;
 });
+threeCanvas.addEventListener("pointermove", e=>{
+  if(!active.has(e.pointerId)) return;
+  active.set(e.pointerId,{x:e.clientX,y:e.clientY});
 
-// ─────────────────────────────────────────────
-//  RENDER LOOP
-// ─────────────────────────────────────────────
-let animT = 0;
-function animate() {
-  requestAnimationFrame(animate);
-  animT += 0.008;
-
-  // Subtle light animation
-  pointL1.position.x = Math.sin(animT) * 4;
-  pointL1.position.z = Math.cos(animT) * 3;
-  pointL2.position.x = Math.cos(animT * 0.7) * 4;
-  pointL2.position.z = Math.sin(animT * 0.7) * 3;
-
-  // Slow auto-rotate when not dragging
-  if (!orbit.dragging && !orbit.rightDrag && latheMesh) {
-    orbit.spherical.theta += 0.002;
+  if(active.size >= 2){
+    const a=[...active.values()];
+    const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+    if(lastPinch) radius *= lastPinch / Math.max(1,d);
+    lastPinch = d;
     updateCamera();
+    return;
   }
 
-  renderer.render(scene, camera);
+  const dx=e.clientX-lastX, dy=e.clientY-lastY;
+  lastX=e.clientX; lastY=e.clientY;
+
+  if(dragMode==="pan"){
+    const pan = new THREE.Vector3();
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix,0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix,1);
+    pan.addScaledVector(right,-dx*0.006*radius);
+    pan.addScaledVector(up,dy*0.006*radius);
+    target.add(pan);
+  }else{
+    theta -= dx*0.006;
+    phi -= dy*0.006;
+  }
+  updateCamera();
+});
+function endPointer(e){
+  active.delete(e.pointerId);
+  dragging = active.size > 0;
+  if(active.size < 2) lastPinch = 0;
+}
+threeCanvas.addEventListener("pointerup", endPointer);
+threeCanvas.addEventListener("pointercancel", endPointer);
+threeCanvas.addEventListener("wheel", e=>{
+  e.preventDefault();
+  radius *= Math.exp(e.deltaY * 0.001);
+  updateCamera();
+},{passive:false});
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(mesh && !dragging){
+    mesh.rotation.y += .0022;
+    wire.rotation.y = mesh.rotation.y;
+  }
+  renderer.render(scene,camera);
 }
 
+resize2D();
+resize3D();
+updateCamera();
 animate();
 </script>
 </body>
