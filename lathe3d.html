@@ -436,14 +436,25 @@ drawCanvas.addEventListener('mousemove', e => {
     updatePtCount();
   }
 });
-
-drawCanvas.addEventListener('mouseup', () => { isDrawing = false; });
-drawCanvas.addEventListener('mouseleave', () => { isDrawing = false; });
+    clearDrawPoints();
 
 function updatePtCount() {
+  function setDrawModeBadge() {
+    modeBadge.textContent = 'DRAW MODE';
+    modeBadge.className = 'badge-draw';
+  }
+
+  function clearDrawPoints() {
+    points = [];
+    isDrawing = false;
+    redraw();
+    updatePtCount();
+    setDrawModeBadge();
+  }
   ptCountEl.textContent = points.length + ' pts';
 }
 
+    setDrawModeBadge();
 document.getElementById('btn-undo').addEventListener('click', () => {
   points.pop();
   redraw();
