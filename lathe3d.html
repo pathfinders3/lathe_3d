@@ -41,6 +41,7 @@
       <button id="undoBtn">Undo</button>
       <button id="clearBtn">Clear</button>
       <button id="importBtn">Import JSON</button>
+      <button id="pasteBtn">Paste JSON</button>
       <button id="createBtn">Create 3D</button>
       <input id="importInput" type="file" accept="application/json,.json" hidden>
       <label>Segments <input id="segSlider" type="range" min="6" max="128" value="32"><span id="segVal">32</span></label>
@@ -68,6 +69,7 @@ const modeBadge = document.getElementById("modeBadge");
 const undoBtn = document.getElementById("undoBtn");
 const clearBtn = document.getElementById("clearBtn");
 const importBtn = document.getElementById("importBtn");
+const pasteBtn = document.getElementById("pasteBtn");
 const importInput = document.getElementById("importInput");
 const createBtn = document.getElementById("createBtn");
 const segSlider = document.getElementById("segSlider");
@@ -230,6 +232,23 @@ importInput.onchange = async e => {
     importInput.value = "";
   }
 };
+
+pasteBtn.onclick = async () => {
+  if(!navigator.clipboard || !navigator.clipboard.readText){
+    flashWarn(pasteBtn);
+    return;
+  }
+
+  try{
+    const txt = await navigator.clipboard.readText();
+    const data = JSON.parse(txt);
+    if(!importFromJsonData(data)) flashWarn(pasteBtn);
+  }catch(err){
+    flashWarn(pasteBtn);
+    console.error("Paste JSON failed:", err);
+  }
+};
+
 segSlider.oninput = () => segVal.textContent = segSlider.value;
 wireSlider.oninput = () => {
   wireVal.textContent = `${wireSlider.value}%`;
