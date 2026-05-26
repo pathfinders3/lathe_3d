@@ -40,7 +40,9 @@
       <span id="ptCount" class="stat">0 pts</span>
       <button id="undoBtn">Undo</button>
       <button id="clearBtn">Clear</button>
+      <button id="importBtn">Import JSON</button>
       <button id="createBtn">Create 3D</button>
+      <input id="importInput" type="file" accept="application/json,.json" hidden>
       <label>Segments <input id="segSlider" type="range" min="6" max="128" value="32"><span id="segVal">32</span></label>
       <label>Wire <input id="wireSlider" type="range" min="0" max="100" value="28"><span id="wireVal">28%</span></label>
     </div>
@@ -65,6 +67,8 @@ const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
 const undoBtn = document.getElementById("undoBtn");
 const clearBtn = document.getElementById("clearBtn");
+const importBtn = document.getElementById("importBtn");
+const importInput = document.getElementById("importInput");
 const createBtn = document.getElementById("createBtn");
 const segSlider = document.getElementById("segSlider");
 const wireSlider = document.getElementById("wireSlider");
@@ -140,6 +144,65 @@ function addPoint(p){
   }
 }
 
+function extractImportPoints(data){
+  if(!data || !Array.isArray(data.groups)) return [];
+  const out = [];
+  for(const group of data.groups){
+    if(!group || !Array.isArray(group.segments)) continue;
+    for(const seg of group.segments){
+      if(!seg || !Array.isArray(seg.points)) continue;
+      for(const p of seg.points){
+        const x = Number(p?.x), y = Number(p?.y);
+        if(Number.isFinite(x) && Number.isFinite(y)) out.push({x,y});
+      }
+    }
+  }
+  return out;
+}
+
+function mapImportPoints(raw, data){
+  const w = drawCanvas.width / dpr;
+  const h = drawCanvas.height / dpr;
+  const pad = 24;
+
+  const xs = raw.map(p=>p.x);
+  const ys = raw.map(p=>p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  let srcW = Number(data?.canvas1ClipboardScale?.sourceWidth);
+  let srcH = Number(data?.canvas1ClipboardScale?.sourceHeight);
+  if(!Number.isFinite(srcW) || srcW <= 0) srcW = Math.max(1, maxX - minX);
+  if(!Number.isFinite(srcH) || srcH <= 0) srcH = Math.max(1, maxY - minY);
+
+  const scale = Math.min(
+    Math.max(1, w - pad * 2) / srcW,
+    Math.max(1, h - pad * 2) / srcH
+  );
+  const offX = (w - srcW * scale) / 2;
+  const offY = (h - srcH * scale) / 2;
+
+  return raw.map(p => ({
+    x: (p.x - minX) * scale + offX,
+    y: (p.y - minY) * scale + offY
+  }));
+}
+
+function flashWarn(button){
+  button.classList.add("warn");
+  setTimeout(()=>button.classList.remove("warn"), 450);
+}
+
+function importFromJsonData(data){
+  const raw = extractImportPoints(data);
+  if(raw.length === 0) return false;
+  points = mapImportPoints(raw, data);
+  clearLathe();
+  setDrawMode(false);
+  draw();
+  return true;
+}
+
 drawCanvas.addEventListener("pointerdown", e => {
   if(e.button !== 0) return;
   drawing = true;
@@ -152,6 +215,21 @@ drawCanvas.addEventListener("pointercancel", () => drawing = false);
 
 undoBtn.onclick = () => { points.pop(); setDrawMode(false); draw(); };
 clearBtn.onclick = () => { points = []; clearLathe(); setDrawMode(false); draw(); };
+importBtn.onclick = () => importInput.click();
+importInput.onchange = async e => {
+  const file = e.target.files?.[0];
+  if(!file) return;
+  try{
+    const txt = await file.text();
+    const data = JSON.parse(txt);
+    if(!importFromJsonData(data)) flashWarn(importBtn);
+  }catch(err){
+    flashWarn(importBtn);
+    console.error("Import JSON failed:", err);
+  }finally{
+    importInput.value = "";
+  }
+};
 segSlider.oninput = () => segVal.textContent = segSlider.value;
 wireSlider.oninput = () => {
   wireVal.textContent = `${wireSlider.value}%`;
