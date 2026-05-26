@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 회전체 생성기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Noto+Sans+KR:wght@300;400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --panel: #111118;
+    --border: #1e1e2e;
+    --accent: #7c5cfc;
+    --accent2: #c084fc;
+    --accent3: #38bdf8;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --canvas-bg: #0d0d16;
+    --grid: rgba(124,92,252,0.08);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── LEFT PANEL ── */
+  #left {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10;
+  }
+
+  #header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--accent2);
+    text-transform: uppercase;
+  }
+
+  #header p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.5;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Draw canvas */
+  #draw-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--canvas-bg);
+  }
+
+  #draw-canvas {
+    display: block;
+    cursor: crosshair;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* axis indicator */
+  #axis-label {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(124,92,252,0.12);
+    border: 1px solid rgba(124,92,252,0.25);
+    padding: 2px 10px;
+    border-radius: 20px;
+    pointer-events: none;
+    letter-spacing: 0.08em;
+  }
+
+  #controls {
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+    background: rgba(124,92,252,0.08);
+  }
+
+  .btn-primary {
+    flex: 1;
+    padding: 11px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: linear-gradient(135deg, rgba(124,92,252,0.2), rgba(192,132,252,0.15));
+    color: var(--accent2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.25s;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .btn-primary:hover::before { opacity: 0.15; }
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(124,92,252,0.3);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary span { position: relative; z-index: 1; }
+
+  .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .pt-count {
+    color: var(--accent3);
+    font-weight: 600;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(124,92,252,0.5);
+  }
+
+  .slider-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── RIGHT / 3D ── */
+  #right {
+    flex: 1;
+    position: relative;
+    background: var(--bg);
+  }
+
+  #three-canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  #three-hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  #empty-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    pointer-events: none;
+  }
+
+  #empty-hint .big {
+    font-size: 48px;
+    opacity: 0.07;
+  }
+
+  #empty-hint .msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* mode badge */
+  #mode-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+
+  .badge-draw {
+    background: rgba(56,189,248,0.1);
+    border: 1px solid rgba(56,189,248,0.25);
+    color: var(--accent3);
+  }
+
+  .badge-3d {
+    background: rgba(124,92,252,0.12);
+    border: 1px solid rgba(124,92,252,0.3);
+    color: var(--accent2);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- LEFT: 2D drawing panel -->
+  <div id="left">
+    <div id="header">
+      <h1>3D Lathe Generator</h1>
+      <p>// 왼쪽에 단면 윤곽을 그리세요<br>// 중심축을 기준으로 회전체를 생성합니다</p>
+    </div>
+
+    <div id="draw-wrap">
+      <canvas id="draw-canvas"></canvas>
+      <div id="axis-label">◀ 회전 중심축</div>
+    </div>
+
+    <div id="controls">
+      <div class="label-row">
+        <span>점 개수</span>
+        <span class="pt-count" id="pt-count">0 pts</span>
+      </div>
+
+      <div class="slider-wrap">
+        <div class="label-row">
+          <span>회전 분할 수</span>
+          <span class="pt-count" id="seg-val">32</span>
+        </div>
+        <input type="range" id="seg-slider" min="6" max="128" value="32">
+      </div>
+
+      <div class="slider-wrap">
+        <div class="label-row">
+          <span>와이어프레임 불투명도</span>
+          <span class="pt-count" id="wire-val">30%</span>
+        </div>
+        <input type="range" id="wire-slider" min="0" max="100" value="30">
+      </div>
+
+      <div class="ctrl-row">
+        <button class="btn" id="btn-undo">↩ Undo</button>
+        <button class="btn" id="btn-clear">✕ Clear</button>
+      </div>
+
+      <button class="btn-primary" id="btn-create">
+        <span>⟳ Create 3D</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Three.js 3D view -->
+  <div id="right">
+    <div id="empty-hint" id="empty-hint">
+      <div class="big">◎</div>
+      <div class="msg">왼쪽에 선을 그린 후 Create 3D를 누르세요</div>
+    </div>
+    <canvas id="three-canvas"></canvas>
+    <div id="three-hint">드래그: 회전 &nbsp;|&nbsp; 스크롤: 줌 &nbsp;|&nbsp; 우클릭 드래그: 이동</div>
+    <div id="mode-badge" class="badge-draw">DRAW MODE</div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  2D DRAW CANVAS
+// ─────────────────────────────────────────────
+const drawCanvas = document.getElementById('draw-canvas');
+const dCtx = drawCanvas.getContext('2d');
+const drawWrap = document.getElementById('draw-wrap');
+const ptCountEl = document.getElementById('pt-count');
+
+let points = [];       // [{x,y}] in canvas coords
+let isDrawing = false;
+
+function resizeDrawCanvas() {
+  const w = drawWrap.clientWidth;
+  const h = drawWrap.clientHeight;
+  drawCanvas.width = w;
+  drawCanvas.height = h;
+  redraw();
+}
+
+function getAxisX() { return drawCanvas.width / 2; }
+
+function redraw() {
+  const w = drawCanvas.width, h = drawCanvas.height;
+  dCtx.clearRect(0, 0, w, h);
+
+  // grid
+  dCtx.strokeStyle = 'rgba(124,92,252,0.06)';
+  dCtx.lineWidth = 1;
+  for (let x = 0; x < w; x += 30) { dCtx.beginPath(); dCtx.moveTo(x, 0); dCtx.lineTo(x, h); dCtx.stroke(); }
+  for (let y = 0; y < h; y += 30) { dCtx.beginPath(); dCtx.moveTo(0, y); dCtx.lineTo(w, y); dCtx.stroke(); }
+
+  // axis line
+  const ax = getAxisX();
+  dCtx.strokeStyle = 'rgba(124,92,252,0.5)';
+  dCtx.lineWidth = 1;
+  dCtx.setLineDash([4, 4]);
+  dCtx.beginPath(); dCtx.moveTo(ax, 0); dCtx.lineTo(ax, h); dCtx.stroke();
+  dCtx.setLineDash([]);
+
+  if (points.length === 0) return;
+
+  // draw curve
+  dCtx.beginPath();
+  dCtx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    dCtx.lineTo(points[i].x, points[i].y);
+  }
+  dCtx.strokeStyle = '#7c5cfc';
+  dCtx.lineWidth = 2.5;
+  dCtx.lineJoin = 'round';
+  dCtx.lineCap = 'round';
+  dCtx.stroke();
+
+  // dots
+  points.forEach((p, i) => {
+    dCtx.beginPath();
+    dCtx.arc(p.x, p.y, i === points.length - 1 ? 5 : 3.5, 0, Math.PI * 2);
+    dCtx.fillStyle = i === 0 ? '#38bdf8' : '#c084fc';
+    dCtx.fill();
+  });
+}
+
+function getPos(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+
+drawCanvas.addEventListener('mousedown', e => {
+  isDrawing = true;
+  const p = getPos(e);
+  points.push(p);
+  redraw();
+  updatePtCount();
+});
+
+drawCanvas.addEventListener('mousemove', e => {
+  if (!isDrawing) return;
+  const p = getPos(e);
+  const last = points[points.length - 1];
+  const dist = Math.hypot(p.x - last.x, p.y - last.y);
+  if (dist > 6) {
+    points.push(p);
+    redraw();
+    updatePtCount();
+  }
+});
+
+drawCanvas.addEventListener('mouseup', () => { isDrawing = false; });
+drawCanvas.addEventListener('mouseleave', () => { isDrawing = false; });
+
+function updatePtCount() {
+  ptCountEl.textContent = points.length + ' pts';
+}
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  points.pop();
+  redraw();
+  updatePtCount();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  points = [];
+  redraw();
+  updatePtCount();
+});
+
+const segSlider = document.getElementById('seg-slider');
+const segVal = document.getElementById('seg-val');
+segSlider.addEventListener('input', () => { segVal.textContent = segSlider.value; });
+
+const wireSlider = document.getElementById('wire-slider');
+const wireVal = document.getElementById('wire-val');
+wireSlider.addEventListener('input', () => {
+  wireVal.textContent = wireSlider.value + '%';
+  if (wireMesh) wireMesh.material.opacity = parseInt(wireSlider.value) / 100;
+});
+
+window.addEventListener('resize', resizeDrawCanvas);
+resizeDrawCanvas();
+
+// ─────────────────────────────────────────────
+//  THREE.JS SETUP
+// ─────────────────────────────────────────────
+const threeCanvas = document.getElementById('three-canvas');
+const rightDiv = document.getElementById('right');
+const emptyHint = document.getElementById('empty-hint');
+const modeBadge = document.getElementById('mode-badge');
+
+const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+
+// Fog
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.035);
+
+// Camera
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 500);
+camera.position.set(4, 2, 5);
+camera.lookAt(0, 0, 0);
+
+// Lights
+const ambient = new THREE.AmbientLight(0x7c5cfc, 0.4);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(5, 10, 7);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+const pointL1 = new THREE.PointLight(0x7c5cfc, 1.5, 30);
+pointL1.position.set(-4, 4, 2);
+scene.add(pointL1);
+
+const pointL2 = new THREE.PointLight(0x38bdf8, 1.2, 30);
+pointL2.position.set(4, -2, -3);
+scene.add(pointL2);
+
+// Grid helper
+const grid = new THREE.GridHelper(20, 40, 0x1e1e2e, 0x1e1e2e);
+scene.add(grid);
+
+// Resize
+function resizeThree() {
+  const w = rightDiv.clientWidth, h = rightDiv.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+window.addEventListener('resize', resizeThree);
+resizeThree();
+
+// ─────────────────────────────────────────────
+//  ORBIT CONTROLS (manual, no import needed)
+// ─────────────────────────────────────────────
+const orbit = {
+  spherical: new THREE.Spherical().setFromVector3(camera.position),
+  target: new THREE.Vector3(0, 0, 0),
+  dragging: false,
+  rightDrag: false,
+  lastX: 0, lastY: 0,
+};
+
+threeCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+threeCanvas.addEventListener('mousedown', e => {
+  if (e.button === 2) { orbit.rightDrag = true; }
+  else { orbit.dragging = true; }
+  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+});
+
+window.addEventListener('mouseup', () => { orbit.dragging = false; orbit.rightDrag = false; });
+
+window.addEventListener('mousemove', e => {
+  const dx = e.clientX - orbit.lastX, dy = e.clientY - orbit.lastY;
+  orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+  if (orbit.dragging) {
+    orbit.spherical.theta -= dx * 0.006;
+    orbit.spherical.phi -= dy * 0.006;
+    orbit.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbit.spherical.phi));
+    updateCamera();
+  }
+  if (orbit.rightDrag) {
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    camera.getWorldDirection(right); right.cross(camera.up).normalize();
+    up.copy(camera.up);
+    orbit.target.addScaledVector(right, -dx * 0.005);
+    orbit.target.addScaledVector(up, dy * 0.005);
+    updateCamera();
+  }
+});
+
+threeCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  orbit.spherical.radius *= 1 + e.deltaY * 0.001;
+  orbit.spherical.radius = Math.max(0.5, Math.min(50, orbit.spherical.radius));
+  updateCamera();
+}, { passive: false });
+
+// Touch
+let lastTouchDist = 0;
+threeCanvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    orbit.dragging = true;
+    orbit.lastX = e.touches[0].clientX;
+    orbit.lastY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    orbit.dragging = false;
+    lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+});
+threeCanvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && orbit.dragging) {
+    const dx = e.touches[0].clientX - orbit.lastX, dy = e.touches[0].clientY - orbit.lastY;
+    orbit.lastX = e.touches[0].clientX; orbit.lastY = e.touches[0].clientY;
+    orbit.spherical.theta -= dx * 0.006;
+    orbit.spherical.phi -= dy * 0.006;
+    orbit.spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbit.spherical.phi));
+    updateCamera();
+  } else if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    orbit.spherical.radius *= lastTouchDist / d;
+    orbit.spherical.radius = Math.max(0.5, Math.min(50, orbit.spherical.radius));
+    lastTouchDist = d;
+    updateCamera();
+  }
+  e.preventDefault();
+}, { passive: false });
+threeCanvas.addEventListener('touchend', () => { orbit.dragging = false; });
+
+function updateCamera() {
+  const pos = new THREE.Vector3().setFromSpherical(orbit.spherical);
+  camera.position.copy(pos.add(orbit.target));
+  camera.lookAt(orbit.target);
+}
+
+// ─────────────────────────────────────────────
+//  3D MESH CREATION
+// ─────────────────────────────────────────────
+let latheMesh = null, wireMesh = null;
+
+function buildLathe(pts, segments) {
+  // Convert canvas coords → 3D lathe points
+  // Canvas: x right, y down. Axis is at canvas center (x = canvas.width/2)
+  // Lathe: radius = distance from axis, height from top
+
+  const cw = drawCanvas.width, ch = drawCanvas.height;
+  const axX = cw / 2;
+
+  // Map to normalized coords, center vertically
+  const normalized = pts.map(p => ({
+    r: Math.abs(p.x - axX) / (cw / 2),   // 0..1 radius
+    y: 1 - p.y / ch                        // 0..1 height (flipped)
+  }));
+
+  // Scale to reasonable 3D size
+  const scale = 2.5;
+  const lathePts = normalized.map(p =>
+    new THREE.Vector2(p.r * scale, (p.y - 0.5) * scale * 1.5)
+  );
+
+  const geo = new THREE.LatheGeometry(lathePts, segments);
+
+  // Smooth normals
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6d28d9,
+    metalness: 0.3,
+    roughness: 0.45,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.5,
+  });
+
+  // Color gradient via vertex colors
+  const posAttr = geo.attributes.position;
+  const colors = [];
+  const colA = new THREE.Color(0x7c5cfc);
+  const colB = new THREE.Color(0x38bdf8);
+  let minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < posAttr.count; i++) {
+    const y = posAttr.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  for (let i = 0; i < posAttr.count; i++) {
+    const t = (posAttr.getY(i) - minY) / (maxY - minY);
+    const c = colA.clone().lerp(colB, t);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  mat.vertexColors = true;
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // Wireframe overlay
+  const wireGeo = new THREE.WireframeGeometry(geo);
+  const wireMat = new THREE.LineBasicMaterial({
+    color: 0xc084fc,
+    transparent: true,
+    opacity: parseInt(wireSlider.value) / 100,
+    depthTest: true,
+  });
+  const wMesh = new THREE.LineSegments(wireGeo, wireMat);
+
+  return { mesh, wMesh };
+}
+
+document.getElementById('btn-create').addEventListener('click', () => {
+  if (points.length < 3) {
+    // Flash hint
+    const btn = document.getElementById('btn-create');
+    btn.style.borderColor = '#f87171';
+    setTimeout(() => btn.style.borderColor = 'var(--accent)', 600);
+    return;
+  }
+
+  // Remove old
+  if (latheMesh) { scene.remove(latheMesh); latheMesh.geometry.dispose(); latheMesh.material.dispose(); }
+  if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); }
+
+  const segments = parseInt(segSlider.value);
+  const { mesh, wMesh } = buildLathe(points, segments);
+  latheMesh = mesh;
+  wireMesh = wMesh;
+
+  scene.add(latheMesh);
+  scene.add(wireMesh);
+
+  emptyHint.style.display = 'none';
+  modeBadge.textContent = '3D VIEW';
+  modeBadge.className = 'badge-3d';
+
+  // Animate camera to nice position
+  orbit.spherical.set(8, Math.PI / 3, Math.PI / 5);
+  updateCamera();
+});
+
+// ─────────────────────────────────────────────
+//  RENDER LOOP
+// ─────────────────────────────────────────────
+let animT = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  animT += 0.008;
+
+  // Subtle light animation
+  pointL1.position.x = Math.sin(animT) * 4;
+  pointL1.position.z = Math.cos(animT) * 3;
+  pointL2.position.x = Math.cos(animT * 0.7) * 4;
+  pointL2.position.z = Math.sin(animT * 0.7) * 3;
+
+  // Slow auto-rotate when not dragging
+  if (!orbit.dragging && !orbit.rightDrag && latheMesh) {
+    orbit.spherical.theta += 0.002;
+    updateCamera();
+  }
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
