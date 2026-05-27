@@ -76,6 +76,7 @@ const segSlider = document.getElementById("segSlider");
 const wireSlider = document.getElementById("wireSlider");
 const segVal = document.getElementById("segVal");
 const wireVal = document.getElementById("wireVal");
+const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
 
 let points = [];
 let drawing = false;
@@ -249,7 +250,28 @@ pasteBtn.onclick = async () => {
   }
 };
 
-segSlider.oninput = () => segVal.textContent = segSlider.value;
+function restoreSegmentsSetting(){
+  try{
+    const saved = Number(localStorage.getItem(SEGMENTS_STORAGE_KEY));
+    const min = Number(segSlider.min);
+    const max = Number(segSlider.max);
+    if(Number.isFinite(saved) && saved >= min && saved <= max){
+      segSlider.value = String(saved);
+    }
+  }catch(err){
+    console.warn("Segments restore failed:", err);
+  }
+  segVal.textContent = segSlider.value;
+}
+
+segSlider.oninput = () => {
+  segVal.textContent = segSlider.value;
+  try{
+    localStorage.setItem(SEGMENTS_STORAGE_KEY, segSlider.value);
+  }catch(err){
+    console.warn("Segments save failed:", err);
+  }
+};
 wireSlider.oninput = () => {
   wireVal.textContent = `${wireSlider.value}%`;
   if(wireMat) wireMat.opacity = +wireSlider.value / 100;
@@ -417,6 +439,7 @@ function animate(){
 }
 
 resize2D();
+restoreSegmentsSetting();
 resize3D();
 updateCamera();
 animate();
