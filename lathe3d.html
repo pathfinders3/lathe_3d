@@ -12,6 +12,8 @@
   .panel{background:rgba(17,24,39,.88);border:1px solid #263244;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px #0008}
   .head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #263244}
   .title{font-weight:800;letter-spacing:.2px}
+  .headActions{display:flex;align-items:center;gap:8px}
+  .headActions button{padding:7px 11px;border-radius:10px;font-size:12px}
   .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#0b1220;color:#7dd3fc;border:1px solid #1e3a5f}
   .badge.view{color:#bbf7d0;border-color:#166534}
   .canvasWrap,.viewWrap{position:relative;flex:1;min-height:0}
@@ -50,7 +52,12 @@
   </section>
 
   <section class="panel">
-    <div class="head"><div class="title">3D 미리보기</div></div>
+    <div class="head">
+      <div class="title">3D 미리보기</div>
+      <div class="headActions">
+        <button id="exportBtn">EXPORT</button>
+      </div>
+    </div>
     <div class="viewWrap">
       <canvas id="threeCanvas"></canvas>
       <div class="hint">좌클릭 드래그 회전 · 우클릭 드래그 팬 · 휠/핀치 줌</div>
@@ -60,10 +67,12 @@
 
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
+import { OBJExporter } from "https://unpkg.com/three@0.165.0/examples/jsm/exporters/OBJExporter.js?module";
 
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
 const threeCanvas = document.getElementById("threeCanvas");
+const exportBtn = document.getElementById("exportBtn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
 const undoBtn = document.getElementById("undoBtn");
@@ -375,6 +384,28 @@ function makeLathe(){
   setDrawMode(true);
 }
 createBtn.onclick = makeLathe;
+
+const objExporter = new OBJExporter();
+function exportObj(){
+  if(!mesh){
+    flashWarn(exportBtn);
+    return;
+  }
+
+  // Export identity-transformed geometry so preview auto-rotation is not baked in.
+  const temp = new THREE.Mesh(mesh.geometry);
+  const objText = objExporter.parse(temp);
+  const blob = new Blob([objText], {type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "lathe_model.obj";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+exportBtn.onclick = exportObj;
 
 const active = new Map();
 let dragMode="rotate", lastX=0, lastY=0, lastPinch=0, dragging=false;
