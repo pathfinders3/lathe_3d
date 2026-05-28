@@ -14,6 +14,8 @@
   .title{font-weight:800;letter-spacing:.2px}
   .headActions{display:flex;align-items:center;gap:8px}
   .headActions button{padding:7px 11px;border-radius:10px;font-size:12px}
+  .headActions label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .headActions input[type=range]{width:96px;accent-color:var(--accent)}
   .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#0b1220;color:#7dd3fc;border:1px solid #1e3a5f}
   .badge.view{color:#bbf7d0;border-color:#166534}
   .canvasWrap,.viewWrap{position:relative;flex:1;min-height:0}
@@ -55,6 +57,7 @@
     <div class="head">
       <div class="title">3D 미리보기</div>
       <div class="headActions">
+        <label>Scale <input id="exportScaleSlider" type="range" min="10" max="300" value="100"><span id="exportScaleVal">100%</span></label>
         <button id="exportBtn">EXPORT</button>
       </div>
     </div>
@@ -72,6 +75,8 @@ import { OBJExporter } from "https://unpkg.com/three@0.165.0/examples/jsm/export
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
 const threeCanvas = document.getElementById("threeCanvas");
+const exportScaleSlider = document.getElementById("exportScaleSlider");
+const exportScaleVal = document.getElementById("exportScaleVal");
 const exportBtn = document.getElementById("exportBtn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
@@ -386,6 +391,9 @@ function makeLathe(){
 createBtn.onclick = makeLathe;
 
 const objExporter = new OBJExporter();
+exportScaleSlider.oninput = () => {
+  exportScaleVal.textContent = `${exportScaleSlider.value}%`;
+};
 function exportObj(){
   if(!mesh){
     flashWarn(exportBtn);
@@ -393,8 +401,12 @@ function exportObj(){
   }
 
   // Export identity-transformed geometry so preview auto-rotation is not baked in.
-  const temp = new THREE.Mesh(mesh.geometry);
+  const scale = Math.max(0.01, Number(exportScaleSlider.value) / 100 || 1);
+  const scaledGeo = mesh.geometry.clone();
+  scaledGeo.scale(scale, scale, scale);
+  const temp = new THREE.Mesh(scaledGeo);
   const objText = objExporter.parse(temp);
+  scaledGeo.dispose();
   const blob = new Blob([objText], {type:"text/plain;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
