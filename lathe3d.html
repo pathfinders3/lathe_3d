@@ -15,7 +15,7 @@
   .headActions{display:flex;align-items:center;gap:8px}
   .headActions button{padding:7px 11px;border-radius:10px;font-size:12px}
   .headActions label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
-  .headActions input[type=range]{width:96px;accent-color:var(--accent)}
+  .headActions input[type=number]{width:72px;padding:6px 8px;border-radius:8px;border:1px solid #334155;background:#182235;color:var(--text);font-weight:700}
   .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:#0b1220;color:#7dd3fc;border:1px solid #1e3a5f}
   .badge.view{color:#bbf7d0;border-color:#166534}
   .canvasWrap,.viewWrap{position:relative;flex:1;min-height:0}
@@ -57,7 +57,7 @@
     <div class="head">
       <div class="title">3D 미리보기</div>
       <div class="headActions">
-        <label>Scale <input id="exportScaleSlider" type="range" min="10" max="300" value="100"><span id="exportScaleVal">100%</span></label>
+        <label>Scale <input id="exportScaleInput" type="number" min="0.001" max="100" step="0.1" value="1.0"></label>
         <button id="exportBtn">EXPORT</button>
       </div>
     </div>
@@ -75,8 +75,7 @@ import { OBJExporter } from "https://unpkg.com/three@0.165.0/examples/jsm/export
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
 const threeCanvas = document.getElementById("threeCanvas");
-const exportScaleSlider = document.getElementById("exportScaleSlider");
-const exportScaleVal = document.getElementById("exportScaleVal");
+const exportScaleInput = document.getElementById("exportScaleInput");
 const exportBtn = document.getElementById("exportBtn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
@@ -391,9 +390,6 @@ function makeLathe(){
 createBtn.onclick = makeLathe;
 
 const objExporter = new OBJExporter();
-exportScaleSlider.oninput = () => {
-  exportScaleVal.textContent = `${exportScaleSlider.value}%`;
-};
 function exportObj(){
   if(!mesh){
     flashWarn(exportBtn);
@@ -401,7 +397,9 @@ function exportObj(){
   }
 
   // Export identity-transformed geometry so preview auto-rotation is not baked in.
-  const scale = Math.max(0.01, Number(exportScaleSlider.value) / 100 || 1);
+  const rawScale = Number(exportScaleInput.value);
+  const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1;
+  if(scale !== rawScale) exportScaleInput.value = String(scale);
   const scaledGeo = mesh.geometry.clone();
   scaledGeo.scale(scale, scale, scale);
   const temp = new THREE.Mesh(scaledGeo);
