@@ -59,6 +59,7 @@
       <div class="headActions">
         <label>Scale <input id="exportScaleInput" type="number" min="0.001" max="100" step="0.1" value="1.0"></label>
         <button id="exportBtn">EXPORT</button>
+        <button id="exportX90Btn">EXPORT X_90</button>
       </div>
     </div>
     <div class="viewWrap">
@@ -77,6 +78,7 @@ const ctx = drawCanvas.getContext("2d");
 const threeCanvas = document.getElementById("threeCanvas");
 const exportScaleInput = document.getElementById("exportScaleInput");
 const exportBtn = document.getElementById("exportBtn");
+const exportX90Btn = document.getElementById("exportX90Btn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
 const undoBtn = document.getElementById("undoBtn");
@@ -402,9 +404,9 @@ function makeLathe(){
 createBtn.onclick = makeLathe;
 
 const objExporter = new OBJExporter();
-function exportObj(){
+function exportObj(rotateX90=false){
   if(!mesh){
-    flashWarn(exportBtn);
+    flashWarn(rotateX90 ? exportX90Btn : exportBtn);
     return;
   }
 
@@ -414,6 +416,9 @@ function exportObj(){
   if(scale !== rawScale) exportScaleInput.value = String(scale);
   const scaledGeo = mesh.geometry.clone();
   scaledGeo.scale(scale, scale, scale);
+  if(rotateX90){
+    scaledGeo.rotateX(Math.PI / 2);
+  }
   const temp = new THREE.Mesh(scaledGeo);
   const objText = objExporter.parse(temp);
   scaledGeo.dispose();
@@ -427,7 +432,8 @@ function exportObj(){
   a.remove();
   URL.revokeObjectURL(url);
 }
-exportBtn.onclick = exportObj;
+exportBtn.onclick = () => exportObj(false);
+exportX90Btn.onclick = () => exportObj(true);
 
 const active = new Map();
 let dragMode="rotate", lastX=0, lastY=0, lastPinch=0, dragging=false;
