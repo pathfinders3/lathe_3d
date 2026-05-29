@@ -220,6 +220,9 @@ function importFromJsonData(data){
     const max = Number(exportScaleInput.max) || 100;
     const clamped = Math.min(max, Math.max(min, importedScale));
     exportScaleInput.value = String(clamped);
+    // Make imported scale value visibly selected for quick confirmation/edit.
+    exportScaleInput.focus();
+    exportScaleInput.select();
   }
 
   clearLathe();
