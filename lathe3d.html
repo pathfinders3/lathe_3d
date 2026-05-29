@@ -213,6 +213,15 @@ function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
   points = mapImportPoints(raw, data);
+
+  const importedScale = Number(data?.canvas1ClipboardScale?.scale);
+  if(Number.isFinite(importedScale) && importedScale > 0){
+    const min = Number(exportScaleInput.min) || 0.001;
+    const max = Number(exportScaleInput.max) || 100;
+    const clamped = Math.min(max, Math.max(min, importedScale));
+    exportScaleInput.value = String(clamped);
+  }
+
   clearLathe();
   setDrawMode(false);
   draw();
