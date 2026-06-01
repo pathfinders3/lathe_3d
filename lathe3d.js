@@ -54,6 +54,21 @@ function updateAxisDistanceInfo(point){
   const dist = Math.abs(point.x - cx);
   axisDistInfo.textContent = `축거리: ${dist.toFixed(1)} px`;
 }
+function updateAxisDistanceStatsSummary(){
+  if(!axisDistInfo || points.length === 0){
+    updateAxisDistanceInfo(null);
+    return;
+  }
+
+  const w = drawCanvas.width / dpr;
+  const cx = w / 2;
+  const distances = points.map(p => Math.abs(p.x - cx));
+  const min = Math.min(...distances);
+  const max = Math.max(...distances);
+  const avg = distances.reduce((sum, v) => sum + v, 0) / distances.length;
+
+  axisDistInfo.textContent = `축거리 평균 ${avg.toFixed(1)} px · 최소 ${min.toFixed(1)} · 최대 ${max.toFixed(1)}`;
+}
 function draw(){
   const w = drawCanvas.width / dpr, h = drawCanvas.height / dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -352,6 +367,7 @@ function makeLathe(){
   wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo), wireMat);
   scene.add(wire);
 
+  updateAxisDistanceStatsSummary();
   setDrawMode(true);
 }
 createBtn.onclick = makeLathe;
