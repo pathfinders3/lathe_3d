@@ -11,6 +11,7 @@
   .app{display:grid;grid-template-columns:1fr 1fr;height:100vh;gap:12px;padding:12px}
   .panel{background:rgba(17,24,39,.88);border:1px solid #263244;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px #0008}
   .head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #263244}
+  .headRight{display:flex;align-items:center;gap:8px}
   .title{font-weight:800;letter-spacing:.2px}
   .headActions{display:flex;align-items:center;gap:8px}
   .headActions button{padding:7px 11px;border-radius:10px;font-size:12px}
@@ -37,7 +38,10 @@
   <section class="panel">
     <div class="head">
       <div class="title">2D 단면 드로잉</div>
-      <div id="modeBadge" class="badge">DRAW MODE</div>
+      <div class="headRight">
+        <div id="modeBadge" class="badge">DRAW MODE</div>
+        <div id="axisDistInfo" class="badge">축거리: -</div>
+      </div>
     </div>
     <div class="canvasWrap"><canvas id="drawCanvas"></canvas></div>
     <div class="toolbar">

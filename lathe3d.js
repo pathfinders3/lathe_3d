@@ -9,6 +9,7 @@ const exportBtn = document.getElementById("exportBtn");
 const exportX90Btn = document.getElementById("exportX90Btn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
+const axisDistInfo = document.getElementById("axisDistInfo");
 const undoBtn = document.getElementById("undoBtn");
 const clearBtn = document.getElementById("clearBtn");
 const importBtn = document.getElementById("importBtn");
@@ -41,6 +42,17 @@ function getCanvasPoint(e){
   const x = (e.clientX - r.left) * (drawCanvas.width / r.width) / dpr;
   const y = (e.clientY - r.top) * (drawCanvas.height / r.height) / dpr;
   return {x,y};
+}
+function updateAxisDistanceInfo(point){
+  if(!axisDistInfo) return;
+  if(!point){
+    axisDistInfo.textContent = "축거리: -";
+    return;
+  }
+  const w = drawCanvas.width / dpr;
+  const cx = w / 2;
+  const dist = Math.abs(point.x - cx);
+  axisDistInfo.textContent = `축거리: ${dist.toFixed(1)} px`;
 }
 function draw(){
   const w = drawCanvas.width / dpr, h = drawCanvas.height / dpr;
@@ -85,6 +97,7 @@ function addPoint(p){
   const last = points[points.length-1];
   if(!last || Math.hypot(p.x-last.x,p.y-last.y) > 2){
     points.push(p);
+    updateAxisDistanceInfo(p);
     setDrawMode(false);
     draw();
   }
@@ -143,6 +156,7 @@ function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
   points = mapImportPoints(raw, data);
+  updateAxisDistanceInfo(points[points.length - 1]);
 
   const importedScale = Number(data?.canvas1ClipboardScale?.scale);
   if(Number.isFinite(importedScale) && importedScale > 0){
@@ -171,8 +185,19 @@ drawCanvas.addEventListener("pointermove", e => drawing && addPoint(getCanvasPoi
 drawCanvas.addEventListener("pointerup", () => drawing = false);
 drawCanvas.addEventListener("pointercancel", () => drawing = false);
 
-undoBtn.onclick = () => { points.pop(); setDrawMode(false); draw(); };
-clearBtn.onclick = () => { points = []; clearLathe(); setDrawMode(false); draw(); };
+undoBtn.onclick = () => {
+  points.pop();
+  updateAxisDistanceInfo(points[points.length - 1]);
+  setDrawMode(false);
+  draw();
+};
+clearBtn.onclick = () => {
+  points = [];
+  updateAxisDistanceInfo(null);
+  clearLathe();
+  setDrawMode(false);
+  draw();
+};
 importBtn.onclick = () => importInput.click();
 importInput.onchange = async e => {
   const file = e.target.files?.[0];
@@ -427,6 +452,7 @@ function animate(){
 
 resize2D();
 restoreSegmentsSetting();
+updateAxisDistanceInfo(null);
 resize3D();
 updateCamera();
 animate();
