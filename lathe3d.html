@@ -28,6 +28,7 @@
   @keyframes shake{50%{transform:translateX(3px)}}
   .stat{color:var(--muted);font-size:13px;margin-right:auto}
   label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .toolbar input[type=number]{width:68px;padding:6px 8px;border-radius:8px;border:1px solid #334155;background:#182235;color:var(--text);font-weight:700}
   input[type=range]{width:120px;accent-color:var(--accent)}
   .hint{position:absolute;left:14px;bottom:14px;color:#94a3b8;font-size:12px;background:#02061799;border:1px solid #243044;border-radius:12px;padding:8px 10px;pointer-events:none}
   @media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.head{height:48px}.toolbar{padding:9px}}
@@ -52,6 +53,8 @@
       <button id="pasteBtn">Paste JSON</button>
       <button id="rotateCcwBtn">Rotate CCW</button>
       <button id="rotateCwBtn">Rotate CW</button>
+      <label>Rotate° <input id="rotateStepInput" type="number" min="0.1" max="180" step="0.1" value="8"></label>
+      <label>Move px <input id="moveStepInput" type="number" min="1" max="200" step="1" value="4"></label>
       <button id="createBtn">Create 3D</button>
       <input id="importInput" type="file" accept="application/json,.json" hidden>
       <label>Segments <input id="segSlider" type="range" min="6" max="128" value="32"><span id="segVal">32</span></label>

@@ -18,13 +18,13 @@ const importInput = document.getElementById("importInput");
 const createBtn = document.getElementById("createBtn");
 const rotateCcwBtn = document.getElementById("rotateCcwBtn");
 const rotateCwBtn = document.getElementById("rotateCwBtn");
+const rotateStepInput = document.getElementById("rotateStepInput");
+const moveStepInput = document.getElementById("moveStepInput");
 const segSlider = document.getElementById("segSlider");
 const wireSlider = document.getElementById("wireSlider");
 const segVal = document.getElementById("segVal");
 const wireVal = document.getElementById("wireVal");
 const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
-const ROTATE_STEP_DEG = 8;
-const MOVE_STEP_PX = 4;
 
 let points = [];
 let drawing = false;
@@ -171,6 +171,22 @@ function flashWarn(button){
   setTimeout(()=>button.classList.remove("warn"), 450);
 }
 
+function getNumericInputValue(input, fallback, min, max){
+  const raw = Number(input?.value);
+  let next = Number.isFinite(raw) ? raw : fallback;
+  next = Math.max(min, Math.min(max, next));
+  if(input) input.value = String(next);
+  return next;
+}
+
+function getRotateStepDeg(){
+  return getNumericInputValue(rotateStepInput, 8, 0.1, 180);
+}
+
+function getMoveStepPx(){
+  return getNumericInputValue(moveStepInput, 4, 1, 200);
+}
+
 function rotatePointsAroundMiddle(direction){
   if(points.length < 2){
     flashWarn(direction > 0 ? rotateCcwBtn : rotateCwBtn);
@@ -179,7 +195,7 @@ function rotatePointsAroundMiddle(direction){
 
   const pivotIndex = Math.floor(points.length / 2);
   const pivot = points[pivotIndex];
-  const angle = (ROTATE_STEP_DEG * Math.PI / 180) * direction;
+  const angle = (getRotateStepDeg() * Math.PI / 180) * direction;
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
 
@@ -309,18 +325,19 @@ window.addEventListener("keydown", e => {
   }
 
   const key = e.key.toLowerCase();
+  const step = getMoveStepPx();
   if(key === "i"){
     e.preventDefault();
-    moveAllPoints(0, -MOVE_STEP_PX);
+    moveAllPoints(0, -step);
   }else if(key === "k"){
     e.preventDefault();
-    moveAllPoints(0, MOVE_STEP_PX);
+    moveAllPoints(0, step);
   }else if(key === "j"){
     e.preventDefault();
-    moveAllPoints(-MOVE_STEP_PX, 0);
+    moveAllPoints(-step, 0);
   }else if(key === "l"){
     e.preventDefault();
-    moveAllPoints(MOVE_STEP_PX, 0);
+    moveAllPoints(step, 0);
   }
 });
 
