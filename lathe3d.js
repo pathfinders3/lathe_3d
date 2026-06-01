@@ -24,6 +24,7 @@ const segVal = document.getElementById("segVal");
 const wireVal = document.getElementById("wireVal");
 const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
 const ROTATE_STEP_DEG = 8;
+const MOVE_STEP_PX = 4;
 
 let points = [];
 let drawing = false;
@@ -198,6 +199,20 @@ function rotatePointsAroundMiddle(direction){
   draw();
 }
 
+function moveAllPoints(dx, dy){
+  if(points.length === 0) return;
+
+  points = points.map(p => ({
+    x: p.x + dx,
+    y: p.y + dy
+  }));
+
+  clearLathe();
+  setDrawMode(false);
+  updateAxisDistanceInfo(points[points.length - 1]);
+  draw();
+}
+
 function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
@@ -278,6 +293,36 @@ pasteBtn.onclick = async () => {
 
 rotateCcwBtn.onclick = () => rotatePointsAroundMiddle(1);
 rotateCwBtn.onclick = () => rotatePointsAroundMiddle(-1);
+
+window.addEventListener("keydown", e => {
+  const target = e.target;
+  if(
+    e.ctrlKey || e.metaKey || e.altKey ||
+    (target instanceof HTMLElement && (
+      target.isContentEditable ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT"
+    ))
+  ){
+    return;
+  }
+
+  const key = e.key.toLowerCase();
+  if(key === "i"){
+    e.preventDefault();
+    moveAllPoints(0, -MOVE_STEP_PX);
+  }else if(key === "k"){
+    e.preventDefault();
+    moveAllPoints(0, MOVE_STEP_PX);
+  }else if(key === "j"){
+    e.preventDefault();
+    moveAllPoints(-MOVE_STEP_PX, 0);
+  }else if(key === "l"){
+    e.preventDefault();
+    moveAllPoints(MOVE_STEP_PX, 0);
+  }
+});
 
 function restoreSegmentsSetting(){
   try{
