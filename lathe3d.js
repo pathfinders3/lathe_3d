@@ -16,11 +16,14 @@ const importBtn = document.getElementById("importBtn");
 const pasteBtn = document.getElementById("pasteBtn");
 const importInput = document.getElementById("importInput");
 const createBtn = document.getElementById("createBtn");
+const rotateCcwBtn = document.getElementById("rotateCcwBtn");
+const rotateCwBtn = document.getElementById("rotateCwBtn");
 const segSlider = document.getElementById("segSlider");
 const wireSlider = document.getElementById("wireSlider");
 const segVal = document.getElementById("segVal");
 const wireVal = document.getElementById("wireVal");
 const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
+const ROTATE_STEP_DEG = 8;
 
 let points = [];
 let drawing = false;
@@ -167,6 +170,34 @@ function flashWarn(button){
   setTimeout(()=>button.classList.remove("warn"), 450);
 }
 
+function rotatePointsAroundMiddle(direction){
+  if(points.length < 2){
+    flashWarn(direction > 0 ? rotateCcwBtn : rotateCwBtn);
+    return;
+  }
+
+  const pivotIndex = Math.floor(points.length / 2);
+  const pivot = points[pivotIndex];
+  const angle = (ROTATE_STEP_DEG * Math.PI / 180) * direction;
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+
+  points = points.map((p, i) => {
+    if(i === pivotIndex) return {x: p.x, y: p.y};
+    const dx = p.x - pivot.x;
+    const dy = p.y - pivot.y;
+    return {
+      x: pivot.x + dx * cosA - dy * sinA,
+      y: pivot.y + dx * sinA + dy * cosA
+    };
+  });
+
+  clearLathe();
+  setDrawMode(false);
+  updateAxisDistanceInfo(points[points.length - 1]);
+  draw();
+}
+
 function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
@@ -244,6 +275,9 @@ pasteBtn.onclick = async () => {
     console.error("Paste JSON failed:", err);
   }
 };
+
+rotateCcwBtn.onclick = () => rotatePointsAroundMiddle(1);
+rotateCwBtn.onclick = () => rotatePointsAroundMiddle(-1);
 
 function restoreSegmentsSetting(){
   try{
