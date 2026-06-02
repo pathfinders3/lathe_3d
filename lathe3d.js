@@ -33,6 +33,8 @@ let drawing = false;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
 let appliedScale = 1;
 let viewScale2D = 1;
+let viewOffsetX2D = 0;
+let viewOffsetY2D = 0;
 
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
@@ -43,7 +45,16 @@ function resize2D(){
   const r = drawCanvas.getBoundingClientRect();
   drawCanvas.width = Math.max(1, Math.round(r.width * dpr));
   drawCanvas.height = Math.max(1, Math.round(r.height * dpr));
+  clamp2DViewOffset();
   draw();
+}
+function clamp2DViewOffset(){
+  const w = drawCanvas.width / dpr;
+  const h = drawCanvas.height / dpr;
+  const maxX = Math.max(0, (viewScale2D - 1) * w / 2);
+  const maxY = Math.max(0, (viewScale2D - 1) * h / 2);
+  viewOffsetX2D = Math.max(-maxX, Math.min(maxX, viewOffsetX2D));
+  viewOffsetY2D = Math.max(-maxY, Math.min(maxY, viewOffsetY2D));
 }
 function getCanvasPoint(e){
   const r = drawCanvas.getBoundingClientRect();
@@ -51,14 +62,15 @@ function getCanvasPoint(e){
   const sy = (e.clientY - r.top) * (drawCanvas.height / r.height) / dpr;
   const w = drawCanvas.width / dpr;
   const h = drawCanvas.height / dpr;
-  const cx = w / 2;
-  const cy = h / 2;
+  const cx = w / 2 + viewOffsetX2D;
+  const cy = h / 2 + viewOffsetY2D;
   const x = cx + (sx - cx) / viewScale2D;
   const y = cy + (sy - cy) / viewScale2D;
   return {x,y};
 }
 function set2DViewScale(next){
   viewScale2D = Math.max(0.3, Math.min(6, next));
+  clamp2DViewOffset();
   draw();
 }
 function updateAxisDistanceInfo(point){
@@ -95,8 +107,8 @@ function draw(){
   ctx.fillStyle = "#0b1020";
   ctx.fillRect(0,0,w,h);
 
-  const cx = w / 2;
-  const cy = h / 2;
+  const cx = w / 2 + viewOffsetX2D;
+  const cy = h / 2 + viewOffsetY2D;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(viewScale2D, viewScale2D);
@@ -293,6 +305,19 @@ drawCanvas.addEventListener("pointerdown", e => {
 drawCanvas.addEventListener("pointermove", e => drawing && addPoint(getCanvasPoint(e)));
 drawCanvas.addEventListener("pointerup", () => drawing = false);
 drawCanvas.addEventListener("pointercancel", () => drawing = false);
+drawCanvas.addEventListener("wheel", e => {
+  if(viewScale2D <= 1) return;
+  e.preventDefault();
+  if(e.shiftKey){
+    // Shift+wheel maps vertical wheel motion to horizontal panning.
+    viewOffsetX2D -= e.deltaY;
+  }else{
+    viewOffsetX2D -= e.deltaX;
+    viewOffsetY2D -= e.deltaY;
+  }
+  clamp2DViewOffset();
+  draw();
+},{passive:false});
 
 undoBtn.onclick = () => {
   points.pop();
