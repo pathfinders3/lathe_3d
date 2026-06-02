@@ -383,6 +383,17 @@ window.addEventListener("keydown", e => {
     return;
   }
 
+  if(e.code === "NumpadAdd"){
+    e.preventDefault();
+    set2DViewScale(viewScale2D * 1.2);
+    return;
+  }
+  if(e.code === "NumpadSubtract"){
+    e.preventDefault();
+    set2DViewScale(viewScale2D / 1.2);
+    return;
+  }
+
   const key = e.key.toLowerCase();
   const step = getMoveStepPx();
   if(key === "i"){
