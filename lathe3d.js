@@ -29,6 +29,7 @@ const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
 let points = [];
 let drawing = false;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
+let appliedScale = 1;
 
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
@@ -185,6 +186,15 @@ function getRotateStepDeg(){
 
 function getMoveStepPx(){
   return getNumericInputValue(moveStepInput, 4, 1, 200);
+}
+
+function getScaleValueForApply(){
+  return getNumericInputValue(exportScaleInput, 1, 0.001, 100);
+}
+
+function applyScaleToCurrentModel(){
+  if(mesh) mesh.scale.setScalar(appliedScale);
+  if(wire) wire.scale.setScalar(appliedScale);
 }
 
 function rotatePointsAroundMiddle(direction){
@@ -463,6 +473,8 @@ function makeLathe(){
   wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo), wireMat);
   scene.add(wire);
 
+  applyScaleToCurrentModel();
+
   updateAxisDistanceStatsSummary();
   setDrawMode(true);
 }
@@ -476,11 +488,8 @@ function exportObj(rotateX90=false){
   }
 
   // Export identity-transformed geometry so preview auto-rotation is not baked in.
-  const rawScale = Number(exportScaleInput.value);
-  const scale = Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1;
-  if(scale !== rawScale) exportScaleInput.value = String(scale);
   const scaledGeo = mesh.geometry.clone();
-  scaledGeo.scale(scale, scale, scale);
+  scaledGeo.scale(appliedScale, appliedScale, appliedScale);
   if(rotateX90){
     scaledGeo.rotateX(Math.PI / 2);
   }
@@ -499,6 +508,13 @@ function exportObj(rotateX90=false){
 }
 exportBtn.onclick = () => exportObj(false);
 exportX90Btn.onclick = () => exportObj(true);
+
+exportScaleInput.addEventListener("keydown", e => {
+  if(e.key !== "Enter") return;
+  e.preventDefault();
+  appliedScale = getScaleValueForApply();
+  applyScaleToCurrentModel();
+});
 
 const active = new Map();
 let dragMode="rotate", lastX=0, lastY=0, lastPinch=0, dragging=false;
