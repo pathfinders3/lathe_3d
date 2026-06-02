@@ -7,6 +7,8 @@ const threeCanvas = document.getElementById("threeCanvas");
 const exportScaleInput = document.getElementById("exportScaleInput");
 const exportBtn = document.getElementById("exportBtn");
 const exportX90Btn = document.getElementById("exportX90Btn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const zoomInBtn = document.getElementById("zoomInBtn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
 const axisDistInfo = document.getElementById("axisDistInfo");
@@ -30,6 +32,7 @@ let points = [];
 let drawing = false;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
 let appliedScale = 1;
+let viewScale2D = 1;
 
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
@@ -44,9 +47,19 @@ function resize2D(){
 }
 function getCanvasPoint(e){
   const r = drawCanvas.getBoundingClientRect();
-  const x = (e.clientX - r.left) * (drawCanvas.width / r.width) / dpr;
-  const y = (e.clientY - r.top) * (drawCanvas.height / r.height) / dpr;
+  const sx = (e.clientX - r.left) * (drawCanvas.width / r.width) / dpr;
+  const sy = (e.clientY - r.top) * (drawCanvas.height / r.height) / dpr;
+  const w = drawCanvas.width / dpr;
+  const h = drawCanvas.height / dpr;
+  const cx = w / 2;
+  const cy = h / 2;
+  const x = cx + (sx - cx) / viewScale2D;
+  const y = cy + (sy - cy) / viewScale2D;
   return {x,y};
+}
+function set2DViewScale(next){
+  viewScale2D = Math.max(0.3, Math.min(6, next));
+  draw();
 }
 function updateAxisDistanceInfo(point){
   if(!axisDistInfo) return;
@@ -82,6 +95,13 @@ function draw(){
   ctx.fillStyle = "#0b1020";
   ctx.fillRect(0,0,w,h);
 
+  const cx = w / 2;
+  const cy = h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(viewScale2D, viewScale2D);
+  ctx.translate(-cx, -cy);
+
   ctx.strokeStyle = "#1e293b";
   ctx.lineWidth = 1;
   const grid = 24;
@@ -111,11 +131,13 @@ function draw(){
       ctx.stroke();
     }
   }
+  ctx.restore();
   ptCount.textContent = `${points.length} pts`;
 }
 function addPoint(p){
   const last = points[points.length-1];
-  if(!last || Math.hypot(p.x-last.x,p.y-last.y) > 2){
+  const minSpacing = 2 / Math.max(0.3, viewScale2D);
+  if(!last || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
     points.push(p);
     updateAxisDistanceInfo(p);
     setDrawMode(false);
@@ -319,6 +341,8 @@ pasteBtn.onclick = async () => {
 
 rotateCcwBtn.onclick = () => rotatePointsAroundMiddle(1);
 rotateCwBtn.onclick = () => rotatePointsAroundMiddle(-1);
+zoomOutBtn.onclick = () => set2DViewScale(viewScale2D / 1.2);
+zoomInBtn.onclick = () => set2DViewScale(viewScale2D * 1.2);
 
 window.addEventListener("keydown", e => {
   const target = e.target;
