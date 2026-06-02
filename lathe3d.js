@@ -514,6 +514,7 @@ exportScaleInput.addEventListener("keydown", e => {
   e.preventDefault();
   appliedScale = getScaleValueForApply();
   applyScaleToCurrentModel();
+  console.log("Applied export scale:", appliedScale);
 });
 
 const active = new Map();
