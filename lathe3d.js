@@ -29,7 +29,6 @@ const wireVal = document.getElementById("wireVal");
 const SEGMENTS_STORAGE_KEY = "lathe3d.segments";
 
 let points = [];
-let drawing = false;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
 let appliedScale = 1;
 let viewScale2D = 1;
@@ -390,7 +389,6 @@ drawCanvas.addEventListener("pointerdown", e => {
   const hitIndex = getHitPointIndex(point);
 
   if(hitIndex >= 0){
-    drawing = false;
     if(e.shiftKey){
       if(rangeAnchorIndex == null){
         rangeAnchorIndex = hitIndex;
@@ -409,13 +407,8 @@ drawCanvas.addEventListener("pointerdown", e => {
 
   clearSelection();
   rangeAnchorIndex = null;
-  drawing = true;
-  drawCanvas.setPointerCapture(e.pointerId);
   addPoint(point);
 });
-drawCanvas.addEventListener("pointermove", e => drawing && addPoint(getCanvasPoint(e)));
-drawCanvas.addEventListener("pointerup", () => drawing = false);
-drawCanvas.addEventListener("pointercancel", () => drawing = false);
 drawCanvas.addEventListener("wheel", e => {
   if(viewScale2D <= 1) return;
   e.preventDefault();
