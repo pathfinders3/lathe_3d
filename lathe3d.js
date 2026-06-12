@@ -35,6 +35,7 @@ let appliedScale = 1;
 let viewScale2D = 1;
 let viewOffsetX2D = 0;
 let viewOffsetY2D = 0;
+const selectedPointIndices = new Set();
 
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
@@ -72,6 +73,34 @@ function set2DViewScale(next){
   viewScale2D = Math.max(0.3, Math.min(6, next));
   clamp2DViewOffset();
   draw();
+}
+function getHitPointIndex(point){
+  const hitRadius = 8 / Math.max(0.3, viewScale2D);
+  const hitRadiusSq = hitRadius * hitRadius;
+  for(let i = points.length - 1; i >= 0; i--){
+    const dx = point.x - points[i].x;
+    const dy = point.y - points[i].y;
+    if(dx * dx + dy * dy <= hitRadiusSq) return i;
+  }
+  return -1;
+}
+function selectPoint(index, additive){
+  if(index < 0 || index >= points.length) return;
+  if(additive){
+    if(selectedPointIndices.has(index)) selectedPointIndices.delete(index);
+    else selectedPointIndices.add(index);
+    return;
+  }
+  selectedPointIndices.clear();
+  selectedPointIndices.add(index);
+}
+function clearSelection(){
+  selectedPointIndices.clear();
+}
+function normalizeSelection(){
+  for(const index of [...selectedPointIndices]){
+    if(index < 0 || index >= points.length) selectedPointIndices.delete(index);
+  }
 }
 function updateAxisDistanceInfo(point){
   if(!axisDistInfo) return;
@@ -134,14 +163,14 @@ function draw(){
     points.forEach((p,i)=> i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
     ctx.stroke();
 
-    for(const p of points){
+    points.forEach((p, i) => {
       ctx.beginPath();
       ctx.arc(p.x,p.y,3.7,0,Math.PI*2);
-      ctx.fillStyle = "#38bdf8";
+      ctx.fillStyle = selectedPointIndices.has(i) ? "#f59e0b" : "#38bdf8";
       ctx.fill();
-      ctx.strokeStyle = "#082f49";
+      ctx.strokeStyle = selectedPointIndices.has(i) ? "#7c2d12" : "#082f49";
       ctx.stroke();
-    }
+    });
   }
   ctx.restore();
   ptCount.textContent = `${points.length} pts`;
@@ -151,6 +180,7 @@ function addPoint(p){
   const minSpacing = 2 / Math.max(0.3, viewScale2D);
   if(!last || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
     points.push(p);
+    normalizeSelection();
     updateAxisDistanceInfo(p);
     setDrawMode(false);
     draw();
@@ -254,6 +284,7 @@ function rotatePointsAroundMiddle(direction){
   });
 
   clearLathe();
+  normalizeSelection();
   setDrawMode(false);
   updateAxisDistanceInfo(points[points.length - 1]);
   draw();
@@ -268,6 +299,7 @@ function moveAllPoints(dx, dy){
   }));
 
   clearLathe();
+  normalizeSelection();
   setDrawMode(false);
   updateAxisDistanceInfo(points[points.length - 1]);
   draw();
@@ -277,6 +309,7 @@ function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
   points = mapImportPoints(raw, data);
+  clearSelection();
   updateAxisDistanceInfo(points[points.length - 1]);
 
   const importedScale = Number(data?.canvas1ClipboardScale?.scale);
@@ -298,9 +331,21 @@ function importFromJsonData(data){
 
 drawCanvas.addEventListener("pointerdown", e => {
   if(e.button !== 0) return;
+  const point = getCanvasPoint(e);
+  const hitIndex = getHitPointIndex(point);
+
+  if(hitIndex >= 0){
+    drawing = false;
+    selectPoint(hitIndex, e.shiftKey);
+    setDrawMode(false);
+    draw();
+    return;
+  }
+
+  clearSelection();
   drawing = true;
   drawCanvas.setPointerCapture(e.pointerId);
-  addPoint(getCanvasPoint(e));
+  addPoint(point);
 });
 drawCanvas.addEventListener("pointermove", e => drawing && addPoint(getCanvasPoint(e)));
 drawCanvas.addEventListener("pointerup", () => drawing = false);
@@ -321,12 +366,14 @@ drawCanvas.addEventListener("wheel", e => {
 
 undoBtn.onclick = () => {
   points.pop();
+  normalizeSelection();
   updateAxisDistanceInfo(points[points.length - 1]);
   setDrawMode(false);
   draw();
 };
 clearBtn.onclick = () => {
   points = [];
+  clearSelection();
   updateAxisDistanceInfo(null);
   clearLathe();
   setDrawMode(false);
