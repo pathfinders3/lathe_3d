@@ -227,13 +227,23 @@ function draw(){
   ctx.restore();
   ptCount.textContent = `${points.length} pts`;
 }
-function addPoint(p){
-  const last = points[points.length-1];
+function addPoint(p, insertIndex = null){
+  const refIndex = insertIndex == null ? points.length - 1 : Math.max(0, insertIndex - 1);
+  const last = points[refIndex];
   const minSpacing = 2 / Math.max(0.3, viewScale2D);
   if(!last || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
-    points.push(p);
-    normalizeSelection();
-    rangeAnchorIndex = null;
+    if(insertIndex == null){
+      points.push(p);
+      normalizeSelection();
+      rangeAnchorIndex = null;
+    }else{
+      pushUndoState();
+      const safeIndex = Math.max(0, Math.min(points.length, insertIndex));
+      points.splice(safeIndex, 0, p);
+      clearSelection();
+      selectedPointIndices.add(safeIndex);
+      rangeAnchorIndex = safeIndex;
+    }
     updateAxisDistanceInfo(p);
     setDrawMode(false);
     draw();
@@ -405,9 +415,22 @@ drawCanvas.addEventListener("pointerdown", e => {
     return;
   }
 
-  clearSelection();
-  rangeAnchorIndex = null;
-  addPoint(point);
+  if(selectedPointIndices.size > 0){
+    const anchorIndex = rangeAnchorIndex != null
+      ? rangeAnchorIndex
+      : Math.min(...selectedPointIndices);
+
+    if(anchorIndex === 0){
+      // If point A is index 0, prepend as the new first point.
+      addPoint(point, 0);
+    }else if(anchorIndex === points.length - 1){
+      addPoint(point, points.length);
+    }
+  }else{
+    clearSelection();
+    rangeAnchorIndex = null;
+    addPoint(point);
+  }
 });
 drawCanvas.addEventListener("wheel", e => {
   if(viewScale2D <= 1) return;
