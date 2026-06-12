@@ -36,6 +36,8 @@ let viewScale2D = 1;
 let viewOffsetX2D = 0;
 let viewOffsetY2D = 0;
 const selectedPointIndices = new Set();
+const undoStack = [];
+const MAX_UNDO_STEPS = 100;
 
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
@@ -101,6 +103,44 @@ function normalizeSelection(){
   for(const index of [...selectedPointIndices]){
     if(index < 0 || index >= points.length) selectedPointIndices.delete(index);
   }
+}
+function captureStateSnapshot(){
+  return {
+    points: points.map(p => ({x: p.x, y: p.y})),
+    selected: [...selectedPointIndices]
+  };
+}
+function pushUndoState(){
+  undoStack.push(captureStateSnapshot());
+  if(undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+}
+function restoreStateSnapshot(snapshot){
+  points = snapshot.points.map(p => ({x: p.x, y: p.y}));
+  clearSelection();
+  for(const idx of snapshot.selected){
+    if(idx >= 0 && idx < points.length) selectedPointIndices.add(idx);
+  }
+  clearLathe();
+  setDrawMode(false);
+  updateAxisDistanceInfo(points[points.length - 1]);
+  draw();
+}
+function undoLastAction(){
+  const snapshot = undoStack.pop();
+  if(!snapshot) return false;
+  restoreStateSnapshot(snapshot);
+  return true;
+}
+function deleteSelectedPoints(){
+  if(selectedPointIndices.size === 0) return false;
+  pushUndoState();
+  points = points.filter((_, idx) => !selectedPointIndices.has(idx));
+  clearSelection();
+  clearLathe();
+  setDrawMode(false);
+  updateAxisDistanceInfo(points[points.length - 1]);
+  draw();
+  return true;
 }
 function updateAxisDistanceInfo(point){
   if(!axisDistInfo) return;
@@ -365,6 +405,7 @@ drawCanvas.addEventListener("wheel", e => {
 },{passive:false});
 
 undoBtn.onclick = () => {
+  if(undoLastAction()) return;
   points.pop();
   normalizeSelection();
   updateAxisDistanceInfo(points[points.length - 1]);
@@ -418,14 +459,35 @@ zoomInBtn.onclick = () => set2DViewScale(viewScale2D * 1.2);
 
 window.addEventListener("keydown", e => {
   const target = e.target;
+  const isEditable = target instanceof HTMLElement && (
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
+  );
+  if(isEditable) return;
+
+  const key = e.key.toLowerCase();
+  const isUndo = (e.ctrlKey || e.metaKey) && !e.shiftKey && key === "z";
+  if(isUndo){
+    e.preventDefault();
+    if(undoLastAction()) return;
+    points.pop();
+    normalizeSelection();
+    updateAxisDistanceInfo(points[points.length - 1]);
+    setDrawMode(false);
+    draw();
+    return;
+  }
+
+  if(e.key === "Delete"){
+    e.preventDefault();
+    deleteSelectedPoints();
+    return;
+  }
+
   if(
-    e.ctrlKey || e.metaKey || e.altKey ||
-    (target instanceof HTMLElement && (
-      target.isContentEditable ||
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.tagName === "SELECT"
-    ))
+    e.ctrlKey || e.metaKey || e.altKey
   ){
     return;
   }
@@ -441,7 +503,6 @@ window.addEventListener("keydown", e => {
     return;
   }
 
-  const key = e.key.toLowerCase();
   const step = getMoveStepPx();
   if(key === "i"){
     e.preventDefault();
