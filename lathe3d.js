@@ -36,6 +36,7 @@ let viewScale2D = 1;
 let viewOffsetX2D = 0;
 let viewOffsetY2D = 0;
 const selectedPointIndices = new Set();
+let rangeAnchorIndex = null;
 const undoStack = [];
 const MAX_UNDO_STEPS = 100;
 
@@ -96,12 +97,22 @@ function selectPoint(index, additive){
   selectedPointIndices.clear();
   selectedPointIndices.add(index);
 }
+function selectRangeBetween(anchorIndex, endIndex){
+  if(anchorIndex == null || endIndex < 0 || endIndex >= points.length) return;
+  const start = Math.min(anchorIndex, endIndex);
+  const end = Math.max(anchorIndex, endIndex);
+  selectedPointIndices.clear();
+  for(let i = start; i <= end; i++) selectedPointIndices.add(i);
+}
 function clearSelection(){
   selectedPointIndices.clear();
 }
 function normalizeSelection(){
   for(const index of [...selectedPointIndices]){
     if(index < 0 || index >= points.length) selectedPointIndices.delete(index);
+  }
+  if(rangeAnchorIndex != null && (rangeAnchorIndex < 0 || rangeAnchorIndex >= points.length)){
+    rangeAnchorIndex = null;
   }
 }
 function captureStateSnapshot(){
@@ -120,6 +131,7 @@ function restoreStateSnapshot(snapshot){
   for(const idx of snapshot.selected){
     if(idx >= 0 && idx < points.length) selectedPointIndices.add(idx);
   }
+  rangeAnchorIndex = selectedPointIndices.size > 0 ? Math.min(...selectedPointIndices) : null;
   clearLathe();
   setDrawMode(false);
   updateAxisDistanceInfo(points[points.length - 1]);
@@ -136,6 +148,7 @@ function deleteSelectedPoints(){
   pushUndoState();
   points = points.filter((_, idx) => !selectedPointIndices.has(idx));
   clearSelection();
+  rangeAnchorIndex = null;
   clearLathe();
   setDrawMode(false);
   updateAxisDistanceInfo(points[points.length - 1]);
@@ -221,6 +234,7 @@ function addPoint(p){
   if(!last || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
     points.push(p);
     normalizeSelection();
+    rangeAnchorIndex = null;
     updateAxisDistanceInfo(p);
     setDrawMode(false);
     draw();
@@ -350,6 +364,7 @@ function importFromJsonData(data){
   if(raw.length === 0) return false;
   points = mapImportPoints(raw, data);
   clearSelection();
+  rangeAnchorIndex = null;
   updateAxisDistanceInfo(points[points.length - 1]);
 
   const importedScale = Number(data?.canvas1ClipboardScale?.scale);
@@ -376,13 +391,24 @@ drawCanvas.addEventListener("pointerdown", e => {
 
   if(hitIndex >= 0){
     drawing = false;
-    selectPoint(hitIndex, e.shiftKey);
+    if(e.shiftKey){
+      if(rangeAnchorIndex == null){
+        rangeAnchorIndex = hitIndex;
+        selectPoint(hitIndex, false);
+      }else{
+        selectRangeBetween(rangeAnchorIndex, hitIndex);
+      }
+    }else{
+      rangeAnchorIndex = hitIndex;
+      selectPoint(hitIndex, false);
+    }
     setDrawMode(false);
     draw();
     return;
   }
 
   clearSelection();
+  rangeAnchorIndex = null;
   drawing = true;
   drawCanvas.setPointerCapture(e.pointerId);
   addPoint(point);
@@ -415,6 +441,7 @@ undoBtn.onclick = () => {
 clearBtn.onclick = () => {
   points = [];
   clearSelection();
+  rangeAnchorIndex = null;
   updateAxisDistanceInfo(null);
   clearLathe();
   setDrawMode(false);
