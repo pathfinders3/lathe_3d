@@ -20,6 +20,8 @@ const importInput = document.getElementById("importInput");
 const createBtn = document.getElementById("createBtn");
 const rotateCcwBtn = document.getElementById("rotateCcwBtn");
 const rotateCwBtn = document.getElementById("rotateCwBtn");
+const moveNearAxisBtn = document.getElementById("moveNearAxisBtn");
+const moveFarAxisBtn = document.getElementById("moveFarAxisBtn");
 const rotateStepInput = document.getElementById("rotateStepInput");
 const moveStepInput = document.getElementById("moveStepInput");
 const segSlider = document.getElementById("segSlider");
@@ -368,6 +370,27 @@ function moveAllPoints(dx, dy){
   draw();
 }
 
+function scaleAllPointsFromAxis(scaleFactor, warnBtn){
+  if(points.length === 0){
+    if(warnBtn) flashWarn(warnBtn);
+    return;
+  }
+
+  const w = drawCanvas.width / dpr;
+  const cx = w / 2;
+
+  points = points.map(p => ({
+    x: cx + (p.x - cx) * scaleFactor,
+    y: p.y
+  }));
+
+  clearLathe();
+  normalizeSelection();
+  setDrawMode(false);
+  updateAxisDistanceInfo(points[points.length - 1]);
+  draw();
+}
+
 function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
@@ -497,6 +520,8 @@ pasteBtn.onclick = async () => {
 
 rotateCcwBtn.onclick = () => rotatePointsAroundMiddle(1);
 rotateCwBtn.onclick = () => rotatePointsAroundMiddle(-1);
+moveNearAxisBtn.onclick = () => scaleAllPointsFromAxis(0.9, moveNearAxisBtn);
+moveFarAxisBtn.onclick = () => scaleAllPointsFromAxis(1.1, moveFarAxisBtn);
 zoomOutBtn.onclick = () => set2DViewScale(viewScale2D / 1.2);
 zoomInBtn.onclick = () => set2DViewScale(viewScale2D * 1.2);
 
@@ -646,11 +671,11 @@ function makeLathe(){
   const cx = w / 2;
   const minY = Math.min(...points.map(p=>p.y));
   const maxY = Math.max(...points.map(p=>p.y));
-  const maxR = Math.max(...points.map(p=>Math.abs(p.x-cx)), 1);
   const ySpan = Math.max(1, maxY - minY);
+  const worldUnitsPerPixel = 3.2 / Math.max(1, h);
 
   const profile = points.map(p => {
-    const r = Math.max(0.015, Math.abs(p.x - cx) / maxR * 1.55);
+    const r = Math.max(0.015, Math.abs(p.x - cx) * worldUnitsPerPixel);
     const y = (0.5 - (p.y - minY) / ySpan) * 3.2;
     return new THREE.Vector2(r,y);
   });
