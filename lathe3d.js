@@ -1,11 +1,13 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js";
 import { OBJExporter } from "https://unpkg.com/three@0.165.0/examples/jsm/exporters/OBJExporter.js?module";
+import { GLTFExporter } from "https://unpkg.com/three@0.165.0/examples/jsm/exporters/GLTFExporter.js?module";
 
 const drawCanvas = document.getElementById("drawCanvas");
 const ctx = drawCanvas.getContext("2d");
 const threeCanvas = document.getElementById("threeCanvas");
 const exportScaleInput = document.getElementById("exportScaleInput");
 const exportBtn = document.getElementById("exportBtn");
+const exportGlbBtn = document.getElementById("exportGlbBtn");
 const exportX90Btn = document.getElementById("exportX90Btn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
 const zoomInBtn = document.getElementById("zoomInBtn");
@@ -717,6 +719,7 @@ function makeLathe(){
 createBtn.onclick = makeLathe;
 
 const objExporter = new OBJExporter();
+const glbExporter = new GLTFExporter();
 function exportObj(rotateX90=false){
   if(!mesh){
     flashWarn(rotateX90 ? exportX90Btn : exportBtn);
@@ -742,7 +745,42 @@ function exportObj(rotateX90=false){
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+function exportGlb(){
+  if(!mesh){
+    flashWarn(exportGlbBtn);
+    return;
+  }
+
+  // Export identity-transformed geometry so preview auto-rotation is not baked in.
+  const scaledGeo = mesh.geometry.clone();
+  scaledGeo.scale(appliedScale, appliedScale, appliedScale);
+  const temp = new THREE.Mesh(scaledGeo, mesh.material);
+
+  glbExporter.parse(
+    temp,
+    glbData => {
+      const blob = new Blob([glbData], {type:"model/gltf-binary"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "lathe_model.glb";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      scaledGeo.dispose();
+    },
+    err => {
+      console.error("Export GLB failed:", err);
+      flashWarn(exportGlbBtn);
+      scaledGeo.dispose();
+    },
+    {binary:true}
+  );
+}
 exportBtn.onclick = () => exportObj(false);
+exportGlbBtn.onclick = () => exportGlb();
 exportX90Btn.onclick = () => exportObj(true);
 
 exportScaleInput.addEventListener("keydown", e => {
