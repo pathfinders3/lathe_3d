@@ -454,12 +454,11 @@ function scaleAllPointsFromAxis(scaleFactor, warnBtn){
     return;
   }
 
-  const centerX = validPoints.reduce((sum, p) => sum + p.x, 0) / validPoints.length;
-  const centerY = validPoints.reduce((sum, p) => sum + p.y, 0) / validPoints.length;
+  const anchor = validPoints[0];
 
   points = points.map(p => isValidPoint(p) ? ({
-    x: centerX + (p.x - centerX) * scaleFactor,
-    y: centerY + (p.y - centerY) * scaleFactor
+    x: anchor.x + (p.x - anchor.x) * scaleFactor,
+    y: anchor.y + (p.y - anchor.y) * scaleFactor
   }) : null);
 
   clearLathe();
