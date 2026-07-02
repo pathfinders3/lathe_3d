@@ -43,6 +43,63 @@ let rangeAnchorIndex = null;
 const undoStack = [];
 const MAX_UNDO_STEPS = 100;
 
+function isValidPoint(p){
+  return !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+}
+
+function clonePoint(p){
+  return {x: p.x, y: p.y};
+}
+
+function getValidPoints(source = points){
+  return source.filter(isValidPoint);
+}
+
+function getPointRuns(source = points){
+  const runs = [];
+  let current = [];
+
+  for(const p of source){
+    if(isValidPoint(p)){
+      current.push(p);
+    }else if(current.length){
+      runs.push(current);
+      current = [];
+    }
+  }
+
+  if(current.length) runs.push(current);
+  return runs;
+}
+
+function getLastValidPoint(source = points){
+  for(let i = source.length - 1; i >= 0; i--){
+    if(isValidPoint(source[i])) return source[i];
+  }
+  return null;
+}
+
+function normalizePointBreaks(source){
+  const normalized = [];
+  let lastWasBreak = true;
+
+  for(const p of source){
+    if(isValidPoint(p)){
+      normalized.push(clonePoint(p));
+      lastWasBreak = false;
+    }else if(!lastWasBreak && normalized.length){
+      normalized.push(null);
+      lastWasBreak = true;
+    }
+  }
+
+  while(normalized.length && !isValidPoint(normalized[normalized.length - 1])){
+    normalized.pop();
+  }
+
+  return normalized;
+}
+
 function setDrawMode(is3d=false){
   modeBadge.textContent = is3d ? "3D VIEW" : "DRAW MODE";
   modeBadge.classList.toggle("view", is3d);
@@ -84,6 +141,7 @@ function getHitPointIndex(point){
   const hitRadius = 8 / Math.max(0.3, viewScale2D);
   const hitRadiusSq = hitRadius * hitRadius;
   for(let i = points.length - 1; i >= 0; i--){
+    if(!isValidPoint(points[i])) continue;
     const dx = point.x - points[i].x;
     const dy = point.y - points[i].y;
     if(dx * dx + dy * dy <= hitRadiusSq) return i;
@@ -91,7 +149,7 @@ function getHitPointIndex(point){
   return -1;
 }
 function selectPoint(index, additive){
-  if(index < 0 || index >= points.length) return;
+  if(index < 0 || index >= points.length || !isValidPoint(points[index])) return;
   if(additive){
     if(selectedPointIndices.has(index)) selectedPointIndices.delete(index);
     else selectedPointIndices.add(index);
@@ -105,14 +163,16 @@ function selectRangeBetween(anchorIndex, endIndex){
   const start = Math.min(anchorIndex, endIndex);
   const end = Math.max(anchorIndex, endIndex);
   selectedPointIndices.clear();
-  for(let i = start; i <= end; i++) selectedPointIndices.add(i);
+  for(let i = start; i <= end; i++){
+    if(isValidPoint(points[i])) selectedPointIndices.add(i);
+  }
 }
 function clearSelection(){
   selectedPointIndices.clear();
 }
 function normalizeSelection(){
   for(const index of [...selectedPointIndices]){
-    if(index < 0 || index >= points.length) selectedPointIndices.delete(index);
+    if(index < 0 || index >= points.length || !isValidPoint(points[index])) selectedPointIndices.delete(index);
   }
   if(rangeAnchorIndex != null && (rangeAnchorIndex < 0 || rangeAnchorIndex >= points.length)){
     rangeAnchorIndex = null;
@@ -120,7 +180,7 @@ function normalizeSelection(){
 }
 function captureStateSnapshot(){
   return {
-    points: points.map(p => ({x: p.x, y: p.y})),
+    points: points.map(p => isValidPoint(p) ? clonePoint(p) : null),
     selected: [...selectedPointIndices]
   };
 }
@@ -129,15 +189,15 @@ function pushUndoState(){
   if(undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
 }
 function restoreStateSnapshot(snapshot){
-  points = snapshot.points.map(p => ({x: p.x, y: p.y}));
+  points = snapshot.points.map(p => isValidPoint(p) ? clonePoint(p) : null);
   clearSelection();
   for(const idx of snapshot.selected){
-    if(idx >= 0 && idx < points.length) selectedPointIndices.add(idx);
+    if(idx >= 0 && idx < points.length && isValidPoint(points[idx])) selectedPointIndices.add(idx);
   }
   rangeAnchorIndex = selectedPointIndices.size > 0 ? Math.min(...selectedPointIndices) : null;
   clearLathe();
   setDrawMode(false);
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
 }
 function undoLastAction(){
@@ -149,35 +209,37 @@ function undoLastAction(){
 function deleteSelectedPoints(){
   if(selectedPointIndices.size === 0) return false;
   pushUndoState();
-  points = points.filter((_, idx) => !selectedPointIndices.has(idx));
+  points = normalizePointBreaks(points.filter((_, idx) => !selectedPointIndices.has(idx)));
   clearSelection();
   rangeAnchorIndex = null;
   clearLathe();
   setDrawMode(false);
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
   return true;
 }
 function updateAxisDistanceInfo(point){
   if(!axisDistInfo) return;
-  if(!point){
+  const activePoint = isValidPoint(point) ? point : getLastValidPoint(points);
+  if(!activePoint){
     axisDistInfo.textContent = "축거리: -";
     return;
   }
   const w = drawCanvas.width / dpr;
   const cx = w / 2;
-  const dist = Math.abs(point.x - cx);
+  const dist = Math.abs(activePoint.x - cx);
   axisDistInfo.textContent = `축거리: ${dist.toFixed(1)} px`;
 }
 function updateAxisDistanceStatsSummary(){
-  if(!axisDistInfo || points.length === 0){
+  const validPoints = getValidPoints(points);
+  if(!axisDistInfo || validPoints.length === 0){
     updateAxisDistanceInfo(null);
     return;
   }
 
   const w = drawCanvas.width / dpr;
   const cx = w / 2;
-  const distances = points.map(p => Math.abs(p.x - cx));
+  const distances = validPoints.map(p => Math.abs(p.x - cx));
   const min = Math.min(...distances);
   const max = Math.max(...distances);
   const avg = distances.reduce((sum, v) => sum + v, 0) / distances.length;
@@ -215,11 +277,15 @@ function draw(){
   if(points.length){
     ctx.strokeStyle = "#e5e7eb";
     ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    points.forEach((p,i)=> i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
-    ctx.stroke();
+    for(const run of getPointRuns(points)){
+      if(run.length === 0) continue;
+      ctx.beginPath();
+      run.forEach((p,i)=> i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y));
+      ctx.stroke();
+    }
 
     points.forEach((p, i) => {
+      if(!isValidPoint(p)) return;
       ctx.beginPath();
       ctx.arc(p.x,p.y,3.7,0,Math.PI*2);
       ctx.fillStyle = selectedPointIndices.has(i) ? "#f59e0b" : "#38bdf8";
@@ -229,13 +295,12 @@ function draw(){
     });
   }
   ctx.restore();
-  ptCount.textContent = `${points.length} pts`;
+  ptCount.textContent = `${getValidPoints(points).length} pts`;
 }
 function addPoint(p, insertIndex = null){
-  const refIndex = insertIndex == null ? points.length - 1 : Math.max(0, insertIndex - 1);
-  const last = points[refIndex];
+  const last = insertIndex == null ? getLastValidPoint(points) : points[Math.max(0, insertIndex - 1)];
   const minSpacing = 2 / Math.max(0.3, viewScale2D);
-  if(!last || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
+  if(!isValidPoint(last) || Math.hypot(p.x-last.x,p.y-last.y) > minSpacing){
     if(insertIndex == null){
       points.push(p);
       normalizeSelection();
@@ -257,13 +322,20 @@ function addPoint(p, insertIndex = null){
 function extractImportPoints(data){
   if(!data || !Array.isArray(data.groups)) return [];
   const out = [];
+  let wroteAnySegment = false;
   for(const group of data.groups){
     if(!group || !Array.isArray(group.segments)) continue;
     for(const seg of group.segments){
       if(!seg || !Array.isArray(seg.points)) continue;
+      const segmentPoints = [];
       for(const p of seg.points){
         const x = Number(p?.x), y = Number(p?.y);
-        if(Number.isFinite(x) && Number.isFinite(y)) out.push({x,y});
+        if(Number.isFinite(x) && Number.isFinite(y)) segmentPoints.push({x,y});
+      }
+      if(segmentPoints.length){
+        if(wroteAnySegment) out.push(null);
+        out.push(...segmentPoints);
+        wroteAnySegment = true;
       }
     }
   }
@@ -275,8 +347,9 @@ function mapImportPoints(raw, data){
   const h = drawCanvas.height / dpr;
   const pad = 24;
 
-  const xs = raw.map(p=>p.x);
-  const ys = raw.map(p=>p.y);
+  const validRaw = raw.filter(isValidPoint);
+  const xs = validRaw.map(p=>p.x);
+  const ys = validRaw.map(p=>p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
 
@@ -292,10 +365,10 @@ function mapImportPoints(raw, data){
   const offX = (w - srcW * scale) / 2;
   const offY = (h - srcH * scale) / 2;
 
-  return raw.map(p => ({
+  return raw.map(p => isValidPoint(p) ? ({
     x: (p.x - minX) * scale + offX,
     y: (p.y - minY) * scale + offY
-  }));
+  }) : null);
 }
 
 function flashWarn(button){
@@ -329,19 +402,19 @@ function applyScaleToCurrentModel(){
 }
 
 function rotatePointsAroundMiddle(direction){
-  if(points.length < 2){
+  const validPoints = getValidPoints(points);
+  if(validPoints.length < 2){
     flashWarn(direction > 0 ? rotateCcwBtn : rotateCwBtn);
     return;
   }
 
-  const pivotIndex = Math.floor(points.length / 2);
-  const pivot = points[pivotIndex];
+  const pivot = validPoints[Math.floor(validPoints.length / 2)];
   const angle = (getRotateStepDeg() * Math.PI / 180) * direction;
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
 
-  points = points.map((p, i) => {
-    if(i === pivotIndex) return {x: p.x, y: p.y};
+  points = points.map((p) => {
+    if(!isValidPoint(p)) return null;
     const dx = p.x - pivot.x;
     const dy = p.y - pivot.y;
     return {
@@ -353,27 +426,27 @@ function rotatePointsAroundMiddle(direction){
   clearLathe();
   normalizeSelection();
   setDrawMode(false);
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
 }
 
 function moveAllPoints(dx, dy){
-  if(points.length === 0) return;
+  if(getValidPoints(points).length === 0) return;
 
-  points = points.map(p => ({
+  points = points.map(p => isValidPoint(p) ? ({
     x: p.x + dx,
     y: p.y + dy
-  }));
+  }) : null);
 
   clearLathe();
   normalizeSelection();
   setDrawMode(false);
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
 }
 
 function scaleAllPointsFromAxis(scaleFactor, warnBtn){
-  if(points.length === 0){
+  if(getValidPoints(points).length === 0){
     if(warnBtn) flashWarn(warnBtn);
     return;
   }
@@ -381,25 +454,25 @@ function scaleAllPointsFromAxis(scaleFactor, warnBtn){
   const w = drawCanvas.width / dpr;
   const cx = w / 2;
 
-  points = points.map(p => ({
+  points = points.map(p => isValidPoint(p) ? ({
     x: cx + (p.x - cx) * scaleFactor,
     y: p.y
-  }));
+  }) : null);
 
   clearLathe();
   normalizeSelection();
   setDrawMode(false);
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
 }
 
 function importFromJsonData(data){
   const raw = extractImportPoints(data);
   if(raw.length === 0) return false;
-  points = mapImportPoints(raw, data);
+  points = normalizePointBreaks(mapImportPoints(raw, data));
   clearSelection();
   rangeAnchorIndex = null;
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
 
   const importedScale = Number(data?.canvas1ClipboardScale?.scale);
   if(Number.isFinite(importedScale) && importedScale > 0){
@@ -475,7 +548,7 @@ undoBtn.onclick = () => {
   if(undoLastAction()) return;
   points.pop();
   normalizeSelection();
-  updateAxisDistanceInfo(points[points.length - 1]);
+  updateAxisDistanceInfo(getLastValidPoint(points));
   setDrawMode(false);
   draw();
 };
@@ -544,7 +617,7 @@ window.addEventListener("keydown", e => {
     if(undoLastAction()) return;
     points.pop();
     normalizeSelection();
-    updateAxisDistanceInfo(points[points.length - 1]);
+    updateAxisDistanceInfo(getLastValidPoint(points));
     setDrawMode(false);
     draw();
     return;
@@ -651,17 +724,29 @@ function resize3D(){
   camera.aspect = r.width / Math.max(1,r.height);
   camera.updateProjectionMatrix();
 }
+function disposeObject3D(root, disposeMaterials = true){
+  root.traverse(obj => {
+    obj.geometry?.dispose();
+    if(!disposeMaterials) return;
+    if(Array.isArray(obj.material)){
+      obj.material.forEach(material => material?.dispose?.());
+    }else{
+      obj.material?.dispose?.();
+    }
+  });
+}
 function clearLathe(){
   for(const o of [mesh,wire]){
     if(!o) continue;
     scene.remove(o);
-    o.geometry?.dispose();
-    o.material?.dispose();
+    disposeObject3D(o, o !== wire);
   }
+  if(wireMat) wireMat.dispose();
   mesh = wire = wireMat = null;
 }
 function makeLathe(){
-  if(points.length < 3){
+  const runs = getPointRuns(points).filter(run => run.length >= 3);
+  if(runs.length === 0){
     createBtn.classList.add("warn");
     setTimeout(()=>createBtn.classList.remove("warn"),450);
     return;
@@ -669,47 +754,61 @@ function makeLathe(){
 
   clearLathe();
 
+  const validPoints = getValidPoints(points);
   const w = drawCanvas.width / dpr, h = drawCanvas.height / dpr;
   const cx = w / 2;
-  const minY = Math.min(...points.map(p=>p.y));
-  const maxY = Math.max(...points.map(p=>p.y));
+  const minY = Math.min(...validPoints.map(p=>p.y));
+  const maxY = Math.max(...validPoints.map(p=>p.y));
   const ySpan = Math.max(1, maxY - minY);
   const worldUnitsPerPixel = 3.2 / Math.max(1, h);
-
-  const profile = points.map(p => {
-    const r = Math.max(0.015, Math.abs(p.x - cx) * worldUnitsPerPixel);
-    const y = (0.5 - (p.y - minY) / ySpan) * 3.2;
-    return new THREE.Vector2(r,y);
-  });
-
-  const geo = new THREE.LatheGeometry(profile, +segSlider.value);
-  geo.computeVertexNormals();
-
-  const pos = geo.attributes.position;
-  const colors = [];
-  const colorA = new THREE.Color("#38bdf8");
-  const colorB = new THREE.Color("#a78bfa");
-  const colorC = new THREE.Color("#f472b6");
-  let ymin=Infinity,ymax=-Infinity;
-  for(let i=0;i<pos.count;i++){ const y=pos.getY(i); ymin=Math.min(ymin,y); ymax=Math.max(ymax,y); }
-  for(let i=0;i<pos.count;i++){
-    const t = (pos.getY(i)-ymin) / Math.max(.0001,ymax-ymin);
-    const c = t < .5 ? colorA.clone().lerp(colorB,t*2) : colorB.clone().lerp(colorC,(t-.5)*2);
-    colors.push(c.r,c.g,c.b);
-  }
-  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors,3));
-
-  const mat = new THREE.MeshStandardMaterial({
-    roughness:.42, metalness:.18, vertexColors:true, side:THREE.DoubleSide
-  });
-  mesh = new THREE.Mesh(geo,mat);
-  scene.add(mesh);
-
+  mesh = new THREE.Group();
+  wire = new THREE.Group();
   wireMat = new THREE.LineBasicMaterial({
     color:0xffffff, transparent:true, opacity:+wireSlider.value/100, depthTest:true
   });
-  wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo), wireMat);
+
+  const colorA = new THREE.Color("#38bdf8");
+  const colorB = new THREE.Color("#a78bfa");
+  const colorC = new THREE.Color("#f472b6");
+
+  for(const run of runs){
+    const profile = run.map(p => {
+      const r = Math.max(0.015, Math.abs(p.x - cx) * worldUnitsPerPixel);
+      const y = (0.5 - (p.y - minY) / ySpan) * 3.2;
+      return new THREE.Vector2(r,y);
+    });
+
+    const geo = new THREE.LatheGeometry(profile, +segSlider.value);
+    geo.computeVertexNormals();
+
+    const pos = geo.attributes.position;
+    const colors = [];
+    let ymin=Infinity,ymax=-Infinity;
+    for(let i=0;i<pos.count;i++){
+      const y = pos.getY(i);
+      ymin = Math.min(ymin, y);
+      ymax = Math.max(ymax, y);
+    }
+    for(let i=0;i<pos.count;i++){
+      const t = (pos.getY(i)-ymin) / Math.max(.0001,ymax-ymin);
+      const c = t < .5 ? colorA.clone().lerp(colorB,t*2) : colorB.clone().lerp(colorC,(t-.5)*2);
+      colors.push(c.r,c.g,c.b);
+    }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors,3));
+
+    const mat = new THREE.MeshStandardMaterial({
+      roughness:.42, metalness:.18, vertexColors:true, side:THREE.DoubleSide
+    });
+    const solid = new THREE.Mesh(geo,mat);
+    mesh.add(solid);
+
+    const wireGeo = new THREE.WireframeGeometry(geo);
+    const wireMesh = new THREE.LineSegments(wireGeo, wireMat);
+    wire.add(wireMesh);
+  }
+
   scene.add(wire);
+  scene.add(mesh);
 
   applyScaleToCurrentModel();
 
@@ -727,14 +826,12 @@ function exportObj(rotateX90=false){
   }
 
   // Export identity-transformed geometry so preview auto-rotation is not baked in.
-  const scaledGeo = mesh.geometry.clone();
-  scaledGeo.scale(appliedScale, appliedScale, appliedScale);
+  const temp = mesh.clone(true);
+  temp.scale.setScalar(appliedScale);
   if(rotateX90){
-    scaledGeo.rotateX(Math.PI / 2);
+    temp.rotateX(Math.PI / 2);
   }
-  const temp = new THREE.Mesh(scaledGeo);
   const objText = objExporter.parse(temp);
-  scaledGeo.dispose();
   const blob = new Blob([objText], {type:"text/plain;charset=utf-8"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -753,9 +850,8 @@ function exportGlb(){
   }
 
   // Export identity-transformed geometry so preview auto-rotation is not baked in.
-  const scaledGeo = mesh.geometry.clone();
-  scaledGeo.scale(appliedScale, appliedScale, appliedScale);
-  const temp = new THREE.Mesh(scaledGeo, mesh.material);
+  const temp = mesh.clone(true);
+  temp.scale.setScalar(appliedScale);
 
   glbExporter.parse(
     temp,
@@ -769,12 +865,10 @@ function exportGlb(){
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      scaledGeo.dispose();
     },
     err => {
       console.error("Export GLB failed:", err);
       flashWarn(exportGlbBtn);
-      scaledGeo.dispose();
     },
     {binary:true}
   );
