@@ -14,6 +14,8 @@ const zoomInBtn = document.getElementById("zoomInBtn");
 const ptCount = document.getElementById("ptCount");
 const modeBadge = document.getElementById("modeBadge");
 const axisDistInfo = document.getElementById("axisDistInfo");
+const compressSpacingBtn = document.getElementById("compressSpacingBtn");
+const expandSpacingBtn = document.getElementById("expandSpacingBtn");
 const undoBtn = document.getElementById("undoBtn");
 const clearBtn = document.getElementById("clearBtn");
 const importBtn = document.getElementById("importBtn");
@@ -446,17 +448,18 @@ function moveAllPoints(dx, dy){
 }
 
 function scaleAllPointsFromAxis(scaleFactor, warnBtn){
-  if(getValidPoints(points).length === 0){
+  const validPoints = getValidPoints(points);
+  if(validPoints.length === 0){
     if(warnBtn) flashWarn(warnBtn);
     return;
   }
 
-  const w = drawCanvas.width / dpr;
-  const cx = w / 2;
+  const centerX = validPoints.reduce((sum, p) => sum + p.x, 0) / validPoints.length;
+  const centerY = validPoints.reduce((sum, p) => sum + p.y, 0) / validPoints.length;
 
   points = points.map(p => isValidPoint(p) ? ({
-    x: cx + (p.x - cx) * scaleFactor,
-    y: p.y
+    x: centerX + (p.x - centerX) * scaleFactor,
+    y: centerY + (p.y - centerY) * scaleFactor
   }) : null);
 
   clearLathe();
@@ -464,6 +467,10 @@ function scaleAllPointsFromAxis(scaleFactor, warnBtn){
   setDrawMode(false);
   updateAxisDistanceInfo(getLastValidPoint(points));
   draw();
+}
+
+function adjustPointSpacing(scaleFactor, warnBtn){
+  scaleAllPointsFromAxis(scaleFactor, warnBtn);
 }
 
 function importFromJsonData(data){
@@ -597,6 +604,8 @@ rotateCcwBtn.onclick = () => rotatePointsAroundMiddle(1);
 rotateCwBtn.onclick = () => rotatePointsAroundMiddle(-1);
 moveNearAxisBtn.onclick = () => scaleAllPointsFromAxis(0.9, moveNearAxisBtn);
 moveFarAxisBtn.onclick = () => scaleAllPointsFromAxis(1.1, moveFarAxisBtn);
+compressSpacingBtn.onclick = () => adjustPointSpacing(0.8, compressSpacingBtn);
+expandSpacingBtn.onclick = () => adjustPointSpacing(1.2, expandSpacingBtn);
 zoomOutBtn.onclick = () => set2DViewScale(viewScale2D / 1.2);
 zoomInBtn.onclick = () => set2DViewScale(viewScale2D * 1.2);
 

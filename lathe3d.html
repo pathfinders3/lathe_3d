@@ -12,8 +12,11 @@
   .app{display:grid;grid-template-columns:1fr 1fr;height:100vh;gap:12px;padding:12px}
   .panel{background:rgba(17,24,39,.88);border:1px solid #263244;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px #0008}
   .head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #263244}
+  .headLeft{display:flex;align-items:center;gap:12px;min-width:0}
   .headRight{display:flex;align-items:center;gap:8px}
   .title{font-weight:800;letter-spacing:.2px}
+  .headScaleActions{display:flex;align-items:center;gap:6px}
+  .headScaleActions button{padding:6px 10px;border-radius:10px;font-size:12px;line-height:1}
   .headActions{display:flex;align-items:center;gap:8px}
   .headActions button{padding:7px 11px;border-radius:10px;font-size:12px}
   .headActions label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
@@ -39,7 +42,13 @@
 <div class="app">
   <section class="panel">
     <div class="head">
-      <div class="title">2D 단면 드로잉</div>
+      <div class="headLeft">
+        <div class="title">2D 단면 드로잉</div>
+        <div class="headScaleActions">
+          <button id="compressSpacingBtn" type="button" aria-label="점 간격 20% 축소">--</button>
+          <button id="expandSpacingBtn" type="button" aria-label="점 간격 20% 확대">++</button>
+        </div>
+      </div>
       <div class="headRight">
         <button id="zoomOutBtn" type="button" aria-label="2D Zoom Out">-</button>
         <button id="zoomInBtn" type="button" aria-label="2D Zoom In">+</button>
